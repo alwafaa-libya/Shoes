@@ -195,7 +195,7 @@ label.f input,label.f textarea{border:1.5px solid var(--line);border-radius:10px
 /* الوفاء المتميز — صفحة الطلبات مع مخزون مشترك عبر Firebase */
 (function(){
 document.documentElement.setAttribute('dir','rtl');document.documentElement.setAttribute('lang','ar');
-var CFG={apiKey:"AIzaSyCtQXkFPA05BIoqGkHO2wHmKBuEmPQFtFM",authDomain:"kamal-shoes.firebaseapp.com",projectId:"kamal-shoes",storageBucket:"kamal-shoes.firebasestorage.app",messagingSenderId:"189663881984",appId:"1:189663881984:web:05b81325ad60511317e1e5"};
+var CFG={apiKey:"AIzaSyCtQXkFPAO5BIoqGkHO2wHmKBuEmPQFtFM",authDomain:"kamal-shoes.firebaseapp.com",projectId:"kamal-shoes",storageBucket:"kamal-shoes.firebasestorage.app",messagingSenderId:"189663881984",appId:"1:189663881984:web:05b81325ad60511317e1e5"};
 var V='10.14.1',G='https://www.gstatic.com/firebasejs/'+V+'/';
 var D=JSON.parse(document.getElementById('data').textContent);
 var SEED=JSON.parse(JSON.stringify(D.products));
@@ -457,7 +457,7 @@ document.addEventListener('click',function(e){
 });
 document.addEventListener('submit',function(e){if(e.target.id!=='loginF')return;e.preventDefault();
  var em=document.getElementById('lEmail').value.trim(),pw=document.getElementById('lPass').value,er=document.getElementById('lErr');
- fb.auth.signInWithEmailAndPassword(auth,em,pw).catch(function(x){er.hidden=false;er.textContent=/invalid|wrong|not-found|credential/.test(x.code||'')?'البريد أو كلمة السر غير صحيحة.':x.code==='auth/too-many-requests'?'محاولات كثيرة. انتظر قليلاً.':'تعذّر الدخول. تأكد من الإنترنت.'})});
+ fb.auth.signInWithEmailAndPassword(auth,em,pw).catch(function(x){er.hidden=false;er.textContent=/invalid|wrong|not-found|credential/.test(x.code||'')?'البريد أو كلمة السر غير صحيحة.':x.code==='auth/too-many-requests'?'محاولات كثيرة. انتظر قليلاً.':'تعذّر الدخول. تأكد من الإنترنت. ('+(x.code||'')+')'})});
 document.addEventListener('keydown',function(e){if(e.key==='Escape'){closeZoom();closeSheets()}if(document.getElementById('zoom')){if(e.key==='ArrowLeft')step(1);if(e.key==='ArrowRight')step(-1)}});
 document.addEventListener('input',function(e){var t=e.target;
  if(t.dataset.f){var p=find(t.dataset.id),f=t.dataset.f;p[f]=(f==='code'||f==='sizes')?t.value.trim():Math.max(0,Number(t.value)||0);p._dirty=true;var b=document.querySelector('[data-savep="'+p.id+'"]');if(b)b.disabled=false;var c=t.closest('.card');if(c)c.classList.add('dirty');return}
