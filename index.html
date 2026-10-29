@@ -495,7 +495,8 @@ function aiApply(p,r,force){var got=0;if(!r)return 0;
  var pk=parseInt(r.pack,10);if(pk>0&&(force||!p.pack||p._newPack)){p.pack=pk;delete p._newPack;got++}
  var nm=r.name?String(r.name).trim():'';if(nm&&(force||!p.name)){p.name=nm;got++}
  if(got)p._dirty=true;return got}
-function findCode(code){var c=String(code||'').toLowerCase().replace(/\s/g,''),hit=null;if(!c)return null;D.products.forEach(function(p){if(String(p.code).toLowerCase().replace(/\s/g,'')===c)hit=p});return hit}
+function ckey(x){return String(x||'').toLowerCase().replace(/[^a-z0-9]/g,'')}
+function findCode(code){var c=ckey(code),hit=null;if(!c)return null;D.products.forEach(function(p){if(!hit&&ckey(p.code)===c)hit=p});return hit}
 function byName(n){var b=String(n||'').replace(/\.[^.]+$/,'').trim();return findCode(b)||findCode(b.replace(/(\s*\(\d+\)|[\s_]+\d{1,2})$/,''))}
 function photoBatch(files){aiBusy=files.length;render();var made=0,attached=0,failed=0,lastErr=null,chain=Promise.resolve();
  files.forEach(function(f){chain=chain.then(function(){return shrink(f).then(function(src){
