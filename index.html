@@ -394,7 +394,7 @@ function renderAdmin(){
  }else{
   if(live&&D.fromDb&&D.products.some(function(p){return !p._dirty}))h+='<div class="scanbox"><div><b>🗑️ حذف كل الأصناف</b><span>يحذف كل الأصناف وصورها من الموقع نهائياً، لتبدأ من جديد بملف إكسل وصور جديدة. الطلبات السابقة لا تُحذف.</span></div><button class="btn ghost" id="delAll" type="button" style="color:#b3261e;border-color:#b3261e">حذف الكل</button></div>';
   if((!live||!D.fromDb)&&SEED.length)h+='<div class="scanbox"><div><b>الأصناف ليست في قاعدة البيانات بعد</b><span>اضغط الزر مرة واحدة لنقل الأصناف الحالية مع صورها وكمياتها إلى قاعدة البيانات. بعدها يصبح المخزون مشتركاً لكل الزبائن.</span></div><button class="scan" id="seed" type="button">نقل الأصناف</button></div>';
-  if(D.fromDb)h+='<div class="scanbox"><div><b>📷 أصناف من الصور</b><span>اختر صورة أو عدة صور، فيقرأ النظام رقم الصنف والمقاسات وعبوة الكرتونة منها. إذا كان رقم الصنف موجوداً (مثلاً من الإكسل) تُضاف الصورة له، وإلا يُنشأ صنف جديد.</span></div><label class="scan'+(aiBusy?' busy':'')+'" for="aiIn">'+(aiBusy?'جارٍ قراءة الصور… ('+aiBusy+')':'اختر الصور')+'</label></div>';
+  if(D.fromDb)h+='<div class="scanbox"><div><b>📷 أصناف من الصور</b><span>اختر صورة أو عدة صور. إذا كان اسم ملف الصورة هو رقم الصنف (مثل DT-261084.jpg أو DT-261084 (2).jpg) تُضاف للصنف مباشرة. وإلا يقرأ النظام رقم الصنف من الصورة نفسها، فإن وجده أضافها له، وإلا أنشأ صنفاً جديداً.</span></div><label class="scan'+(aiBusy?' busy':'')+'" for="aiIn">'+(aiBusy?'جارٍ قراءة الصور… ('+aiBusy+')':'اختر الصور')+'</label></div>';
   var nd=D.products.filter(function(p){return p._dirty}).length;if(nd)h+='<div class="savebar"><span>'+nd+' صنف فيه تعديلات غير محفوظة</span><button class="btn acc" id="saveAll" type="button">حفظ الكل</button></div>';
   if(D.fromDb)h+='<div class="scanbox"><div><b>استيراد الأصناف من إكسل</b><span>رقم الصنف، الاسم، المقاسات، العبوة، السعر، والكمية. الأصناف الموجودة تتحدّث، والجديدة تُضاف. الصور تضيفها باليد بعد ذلك.</span></div><div class="xbtns"><label class="scan" for="xlsIn">اختر ملف الإكسل</label><button class="btn ghost" id="xlsTpl" type="button">تنزيل النموذج</button></div></div>';
   h+='<div class="grid">'+D.products.map(editCard).join('')+'<button class="newcard" id="addProd" type="button">+ صنف جديد</button></div>';
@@ -496,8 +496,10 @@ function aiApply(p,r,force){var got=0;if(!r)return 0;
  var nm=r.name?String(r.name).trim():'';if(nm&&(force||!p.name)){p.name=nm;got++}
  if(got)p._dirty=true;return got}
 function findCode(code){var c=String(code||'').toLowerCase().replace(/\s/g,''),hit=null;if(!c)return null;D.products.forEach(function(p){if(String(p.code).toLowerCase().replace(/\s/g,'')===c)hit=p});return hit}
+function byName(n){var b=String(n||'').replace(/\.[^.]+$/,'').trim();return findCode(b)||findCode(b.replace(/(\s*\(\d+\)|[\s_]+\d{1,2})$/,''))}
 function photoBatch(files){aiBusy=files.length;render();var made=0,attached=0,failed=0,lastErr=null,chain=Promise.resolve();
  files.forEach(function(f){chain=chain.then(function(){return shrink(f).then(function(src){
+  var fx=byName(f.name);if(fx){fx.images=(fx.images||[]).concat(src);fx._dirty=true;attached++;return}
   return aiRead(src).then(function(r){var ex=findCode(r&&r.code);
    if(ex){ex.images=(ex.images||[]).concat(src);aiApply(ex,r,false);ex._dirty=true;attached++}
    else{var np={id:'p'+Date.now().toString(36)+Math.floor(Math.random()*99),code:'صنف جديد',name:'',sizes:'',pack:18,_newPack:1,price:0,stock:0,images:[src],order:D.products.length+1,_dirty:true};aiApply(np,r,true);D.products.push(np);made++}
