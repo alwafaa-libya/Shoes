@@ -472,13 +472,12 @@ function waLink(o,ok){var c=o.customer||{},T=o.totals||{};
  return 'https://wa.me/'+waOf(c.tel)+'?text='+encodeURIComponent(t)}
 function storeNum(){try{return localStorage.getItem('wf_store')||''}catch(e){return ''}}
 function storeText(o){var c=o.customer||{},T=o.totals||{},L=o.lines||[],t=[],sep='━━━━━━━━━━━━━━';
- t.push('📦 *طلب تجهيز للمخزن*');t.push('☑️ *لتأشير «تم التجهيز» أمام كل صنف اضغط هنا:*');t.push(storeUrl(o));t.push(sep);t.push('رقم الطلب: *'+o.no+'*');t.push('التاريخ: '+(o.date||fmtTime(o.createdAt)||today()));t.push(sep);
+ t.push('📦 *طلب تجهيز للمخزن*');t.push('رقم الطلب: *'+o.no+'*');t.push('التاريخ: '+(o.date||fmtTime(o.createdAt)||today()));t.push(sep);
  t.push('👤 الزبون: *'+(c.name||'—')+'*');if(c.city)t.push('📍 المدينة: '+c.city);if(c.tel)t.push('📞 الهاتف: '+c.tel);t.push(sep);
  t.push('*الأصناف المطلوب تجهيزها:*');
- L.forEach(function(l,i){t.push('');t.push('*'+(i+1)+') '+l.code+'*'+(l.name?' - '+l.name:''));t.push('   مقاس: '+l.sizes);t.push('   الكمية: *'+l.q+' كرتونة* ('+l.pcs+' قطعة)')});
+ L.forEach(function(l,i){t.push('');t.push('*'+(i+1)+') '+l.code+'*'+(l.name?' - '+l.name:''));t.push('   مقاس: '+l.sizes);t.push('   الكمية: *'+l.q+' كرتونة* ('+l.pcs+' قطعة)');t.push('   ☐ تم التجهيز')});
  t.push(sep);t.push('📦 *إجمالي الكراتين: '+(T.c||0)+'*');t.push('👟 إجمالي القطع: '+(T.p||0));
  if(c.note){t.push(sep);t.push('📝 ملاحظات الزبون: '+c.note)}
- t.push(sep);t.push('✅ *عند تجهيز الأصناف اضغط هذا الرابط وأشّر على كل صنف جاهز (يصل للإدارة فوراً):*');t.push(storeUrl(o));
  return t.join('\n')}
 function b64e(x){return btoa(unescape(encodeURIComponent(JSON.stringify(x)))).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'')}
 function storeUrl(o){var c=o.customer||{};return location.origin+location.pathname.replace(/admin\/?$/,'')+'#store/'+o.id+'/'+b64e({n:o.no,c:c.name||'',ci:c.city||'',l:(o.lines||[]).map(function(l){return [l.code,l.name||'',l.sizes||'',l.q,l.pcs]})})}
