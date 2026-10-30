@@ -202,7 +202,8 @@ label.f input,label.f textarea{border:1.5px solid var(--line);border-radius:10px
 .preptxt{text-align:center;font-weight:700;margin:0 0 10px}
 .prepdone{background:var(--ok);color:#fff;font-weight:800;text-align:center;padding:14px;border-radius:14px;margin:0 0 12px;font-size:1.05rem}
 .preplist{display:grid;gap:10px}
-.prepi{display:flex;gap:14px;align-items:center;text-align:right;width:100%;background:var(--surface);border:2px solid var(--line);border-radius:14px;padding:14px;color:var(--ink);font:inherit}
+.prepi{display:flex;flex-direction:column;gap:10px;align-items:stretch;text-align:right;width:100%;background:var(--surface);border:2px solid var(--line);border-radius:14px;padding:14px;color:var(--ink);font:inherit;cursor:pointer}
+.prepi .ck{display:flex;align-items:center;gap:12px;border-top:1px dashed var(--line);padding-top:10px;font-weight:800;font-size:1.05rem;color:var(--muted)}.prepi.on .ck{color:var(--ok)}
 .prepi .box{flex:none;width:34px;height:34px;border-radius:9px;border:2.5px solid var(--muted);display:grid;place-items:center;font-size:22px;font-weight:900;color:#fff}
 .prepi.on{border-color:var(--ok);background:#eef9f2}.prepi.on .box{background:var(--ok);border-color:var(--ok)}
 .prepi .pt{display:flex;flex-direction:column}.prepi small{color:var(--muted);font-size:.85rem}
@@ -471,7 +472,7 @@ function waLink(o,ok){var c=o.customer||{},T=o.totals||{};
  return 'https://wa.me/'+waOf(c.tel)+'?text='+encodeURIComponent(t)}
 function storeNum(){try{return localStorage.getItem('wf_store')||''}catch(e){return ''}}
 function storeText(o){var c=o.customer||{},T=o.totals||{},L=o.lines||[],t=[],sep='━━━━━━━━━━━━━━';
- t.push('📦 *طلب تجهيز للمخزن*');t.push('رقم الطلب: *'+o.no+'*');t.push('التاريخ: '+(o.date||fmtTime(o.createdAt)||today()));t.push(sep);
+ t.push('📦 *طلب تجهيز للمخزن*');t.push('☑️ *لتأشير «تم التجهيز» أمام كل صنف اضغط هنا:*');t.push(storeUrl(o));t.push(sep);t.push('رقم الطلب: *'+o.no+'*');t.push('التاريخ: '+(o.date||fmtTime(o.createdAt)||today()));t.push(sep);
  t.push('👤 الزبون: *'+(c.name||'—')+'*');if(c.city)t.push('📍 المدينة: '+c.city);if(c.tel)t.push('📞 الهاتف: '+c.tel);t.push(sep);
  t.push('*الأصناف المطلوب تجهيزها:*');
  L.forEach(function(l,i){t.push('');t.push('*'+(i+1)+') '+l.code+'*'+(l.name?' - '+l.name:''));t.push('   مقاس: '+l.sizes);t.push('   الكمية: *'+l.q+' كرتونة* ('+l.pcs+' قطعة)')});
@@ -500,8 +501,8 @@ function renderStore(){var S=storeMode,L=S.l,d=(prepDoc&&prepDoc.done)||[],k=L.f
  if(prepErr)h+='<p class="err">⚠️ لم يتم تفعيل الحفظ بعد أو لا يوجد إنترنت. أبلغ الإدارة.</p>';
  h+='<div class="prepbar"><div style="width:'+(L.length?Math.round(k*100/L.length):0)+'%"></div></div><p class="preptxt">تم تجهيز <b class="num">'+k+'</b> من <b class="num">'+L.length+'</b> أصناف</p>';
  if(all)h+='<div class="prepdone">✅ الطلب جاهز بالكامل — وصل الإشعار للإدارة</div>';
- h+='<div class="preplist">'+L.map(function(x,i){return '<button class="prepi'+(d[i]?' on':'')+'" data-prep="'+i+'" type="button"><span class="box">'+(d[i]?'✓':'')+'</span><span class="pt"><b class="num">'+esc(x[0])+'</b>'+(x[1]?'<small>'+esc(x[1])+'</small>':'')+'<small>مقاس <span class="num">'+esc(x[2])+'</span> · <b class="num">'+x[3]+'</b> كرتونة (<span class="num">'+x[4]+'</span> قطعة)</small></span></button>'}).join('')+'</div>';
- h+='<p class="note">اضغط على الصنف عند تجهيزه ليظهر عليه ✓. للإلغاء اضغط مرة ثانية.</p></div>';
+ h+='<div class="preplist">'+L.map(function(x,i){return '<button class="prepi'+(d[i]?' on':'')+'" data-prep="'+i+'" type="button"><span class="pt"><b class="num">'+(i+1)+') '+esc(x[0])+'</b>'+(x[1]?'<small>'+esc(x[1])+'</small>':'')+'<small>مقاس <span class="num">'+esc(x[2])+'</span> · <b class="num">'+x[3]+'</b> كرتونة (<span class="num">'+x[4]+'</span> قطعة)</small></span><span class="ck"><span class="box">'+(d[i]?'✓':'')+'</span>'+(d[i]?'تم التجهيز ✔':'تم التجهيز')+'</span></button>'}).join('')+'</div>';
+ h+='<p class="note">اضغط مربع «تم التجهيز» تحت الصنف عند تجهيزه فيظهر عليه ✓. للإلغاء اضغط مرة ثانية.</p></div>';
  app.innerHTML=h}
 function storeLink(o){var n=waOf(storeNum());return (n.length>=9?'https://wa.me/'+n:'https://wa.me/')+'?text='+encodeURIComponent(storeText(o))}
 function editCard(p){
