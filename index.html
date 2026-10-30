@@ -195,6 +195,11 @@ label.f input,label.f textarea{border:1.5px solid var(--line);border-radius:10px
 .tabs{display:flex;gap:8px;margin:0 0 16px;border-bottom:1px solid var(--line)}
 .tab{background:none;border:0;border-bottom:3px solid transparent;padding:8px 12px;font-weight:700;color:var(--muted)}
 .tab.on{color:var(--ink);border-color:var(--accent)}
+.otabs{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin:0 0 14px}
+.otab{border:1.5px solid var(--line);background:var(--surface);color:var(--muted);border-radius:12px;padding:9px 4px;font-weight:700;font-size:.85rem;line-height:1.4}
+.otab span{display:block;font-size:1.05rem}
+.otab.on{color:#fff;border-color:transparent;background:var(--accent)}
+.otab.k-accepted.on{background:var(--ok)}.otab.k-rejected.on{background:#8a8a8a}
 .tab .bdg{background:var(--accent);color:var(--accent-ink);border-radius:99px;padding:0 7px;font-size:.8rem}
 .olist{display:flex;flex-direction:column;gap:14px}
 .ocard{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:14px;display:flex;flex-direction:column;gap:8px}
@@ -234,7 +239,7 @@ var app=document.getElementById('app');
 var pickId=null;document.addEventListener('click',function(e){var l=e.target.closest&&e.target.closest('[data-pick]');if(l)pickId=l.dataset.pick},true);
 var cart={},cust={name:'',city:'',tel:'',note:''},curInv=null;
 var fbApp=null,fb=null,db=null,auth=null,live=false,dbErr='',user=null;
-var isAdminUrl=/admin/i.test(location.hash),adminTab='orders',orders=[],ordersErr='',unsubOrders=null,seenNew=null,busy=false;
+var ordTab='new';var isAdminUrl=/admin/i.test(location.hash),adminTab='orders',orders=[],ordersErr='',unsubOrders=null,seenNew=null,busy=false;
 var zoomList=[],zoomI=0,zoomTitle='';
 
 function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]})}
@@ -415,7 +420,14 @@ function renderAdmin(){
   h+='<div class="storeset"><label>رقم واتساب المخزن<input id="storeNum" type="tel" dir="ltr" inputmode="tel" placeholder="09xxxxxxxx" value="'+esc(storeNum())+'"></label><small>يُحفظ على هذا الجهاز. إذا تركته فارغاً، يسألك الواتساب لمن ترسل (شخص أو مجموعة).</small></div>';
   if(ordersErr)h+='<p class="err">'+esc(ordersErr)+'</p>';
   else if(!orders.length)h+='<p class="empty">لا توجد طلبات بعد. أي طلب يرسله زبون يظهر هنا فوراً.</p>';
-  h+='<div class="olist">'+orders.map(orderCard).join('')+'</div>';
+  else{
+   var G={new:[],accepted:[],rejected:[]};orders.forEach(function(o){(G[o.status]||G.new).push(o)});
+   var lb={new:'🆕 الجديدة',accepted:'✅ الموافق عليها',rejected:'❌ المرفوضة'};
+   h+='<div class="otabs">'+['new','accepted','rejected'].map(function(k){return '<button class="otab'+(ordTab===k?' on':'')+' k-'+k+'" data-otab="'+k+'" type="button">'+lb[k]+' <span class="num">'+G[k].length+'</span></button>'}).join('')+'</div>';
+   var LS=G[ordTab]||[];
+   if(!LS.length)h+='<p class="empty">'+(ordTab==='new'?'لا توجد طلبات جديدة. كل الطلبات تمت مراجعتها 👍':ordTab==='accepted'?'لا توجد فواتير موافق عليها بعد.':'لا توجد طلبات مرفوضة.')+'</p>';
+   h+='<div class="olist">'+LS.map(orderCard).join('')+'</div>';
+  }
  }else{
   if(live&&D.fromDb&&D.products.some(function(p){return !p._dirty}))h+='<div class="scanbox"><div><b>🗑️ حذف كل الأصناف</b><span>يحذف كل الأصناف وصورها من الموقع نهائياً، لتبدأ من جديد بملف إكسل وصور جديدة. الطلبات السابقة لا تُحذف.</span></div><button class="btn ghost" id="delAll" type="button" style="color:#b3261e;border-color:#b3261e">حذف الكل</button></div>';
   if((!live||!D.fromDb)&&SEED.length)h+='<div class="scanbox"><div><b>الأصناف ليست في قاعدة البيانات بعد</b><span>اضغط الزر مرة واحدة لنقل الأصناف الحالية مع صورها وكمياتها إلى قاعدة البيانات. بعدها يصبح المخزون مشتركاً لكل الزبائن.</span></div><button class="scan" id="seed" type="button">نقل الأصناف</button></div>';
@@ -592,7 +604,7 @@ function xlSave(){var F=fb.fs,b=F.writeBatch(db),ord=D.products.reduce(function(
  b.commit().then(function(){closeSheets();toast('تم حفظ '+xlPlan.length+' صنف ✅ أضف الصور للأصناف الجديدة',4500)},function(e){console.error(e);if(g){g.disabled=false;g.textContent='حفظ'}toast(permMsg(e),4500)})}
 function watchOrders(){
  if(unsubOrders)unsubOrders();var F=fb.fs;
- unsubOrders=F.onSnapshot(F.query(F.collection(db,'orders'),F.orderBy('createdAt','desc'),F.limit(100)),function(s){
+ unsubOrders=F.onSnapshot(F.query(F.collection(db,'orders'),F.orderBy('createdAt','desc'),F.limit(500)),function(s){
   orders=s.docs.map(function(d){var x=d.data();x.id=d.id;return x});ordersErr='';
   var nNew=orders.filter(function(o){return o.status==='new'}).length;
   if(seenNew!==null&&nNew>seenNew){toast('🔔 وصل طلب جديد',4000);beep()}
@@ -614,6 +626,7 @@ document.addEventListener('click',function(e){
  if(ds.cinc||ds.cdec||ds.crm){var id=ds.cinc||ds.cdec||ds.crm,pp=find(id);if(ds.cinc&&pp&&cart[id]<pp.stock)cart[id]++;if(ds.cdec)cart[id]--;if(ds.crm||cart[id]<=0)delete cart[id];curInv=null;saveCart();render();openCart();return}
  if(ds.dec){cart[ds.dec]=Math.max(0,(cart[ds.dec]||0)-1);if(!cart[ds.dec])delete cart[ds.dec];curInv=null;saveCart();render();return}
  if(ds.tab){adminTab=ds.tab;render();return}
+ if(ds.otab){ordTab=ds.otab;render();scrollTo(0,0);return}
  if(ds.store){try{fb.fs.updateDoc(fb.fs.doc(db,'orders',ds.store),{sentToStore:true})}catch(er){}return}
  if(ds.invimg){if(invReady[ds.invimg])shareInvImg(ds.invimg);else prepInvImg(ds.invimg);return}
  if(ds.accept){acceptOrder(ds.accept);return}
