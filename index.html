@@ -169,6 +169,7 @@ label.f input,label.f textarea{border:1.5px solid var(--line);border-radius:10px
 .ptot .grand b{font-size:1.25rem}
 .pfoot{margin:10px 0 0;font-size:.78rem;color:var(--muted);text-align:center}
 .wa.off,.wa2.off{opacity:.55}
+.invimg.pdfbtn{background:#2e1838;color:#fff}
 .invimg{display:block;width:100%;margin:10px 0 0;background:var(--ok);color:#fff;border:0;font-weight:700;padding:11px;border-radius:12px;font-size:.95rem}
 .wa2{display:block;text-align:center;border:1.5px solid var(--ok);color:var(--ok);text-decoration:none;font-weight:700;padding:10px;border-radius:12px;font-size:.92rem}
 .shopset{grid-column:1/-1;display:flex;flex-wrap:wrap;gap:10px;background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:12px 16px}
@@ -352,6 +353,31 @@ function prepInvImg(id){var o=orders.filter(function(x){return x.id===id})[0];if
 function shareInvImg(id){var f=invReady[id];if(!f)return;
  if(navigator.canShare&&navigator.canShare({files:[f]})){navigator.share({files:[f]}).catch(function(){});return}
  var u=URL.createObjectURL(f),a=document.createElement('a');a.href=u;a.download=f.name;document.body.appendChild(a);a.click();a.remove();toast('تم حفظ صورة الفاتورة — أرسلها للزبون من واتساب',4000)}
+var pdfReady={},jsP=null;
+function jspdfLib(){if(window.jspdf)return Promise.resolve(window.jspdf);if(!jsP)jsP=new Promise(function(ok,no){var sc=document.createElement('script');sc.src='https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js';sc.onload=function(){ok(window.jspdf)};sc.onerror=function(){jsP=null;no()};document.head.appendChild(sc)});return jsP}
+function a4Pages(o){var c=o.customer||{},T=o.totals||{},L=o.lines||[],pages=[],i=0,first=18,rest=22,tail=5;
+ while(i<L.length||!pages.length){var cap=pages.length?rest:first;pages.push(L.slice(i,i+cap).map(function(l,k){return [i+k,l]}));i+=cap}
+ if(pages[pages.length-1].length>(pages.length>1?rest:first)-tail)pages.push([]);
+ var N=pages.length,dt=o.date||fmtTime(o.createdAt)||today(),css='box-sizing:border-box;width:794px;height:1123px;padding:42px 46px;background:#fff;color:#1a1a1a;font-family:Tahoma,Arial,sans-serif;direction:rtl;position:relative';
+ var th='<tr style="background:#2e1838;color:#fff"><th style="padding:9px 6px;width:42px">#</th><th style="padding:9px 6px;text-align:right">رقم الصنف</th><th style="padding:9px 6px">المقاس</th><th style="padding:9px 6px">الكراتين</th><th style="padding:9px 6px">القطع</th><th style="padding:9px 6px;width:120px">تم التجهيز</th></tr>';
+ return pages.map(function(rows,pi){var h='<div style="'+css+'">';
+  if(pi===0){h+='<div style="display:flex;align-items:center;gap:16px;border-bottom:3px solid #2e1838;padding-bottom:12px"><img src="'+LOGO+'" style="width:74px;height:74px"><div style="flex:1"><div style="font-size:22px;font-weight:800">'+esc(D.shop)+'</div><div style="font-size:26px;font-weight:800;color:#b4245f;margin-top:4px">📦 فاتورة تجهيز للمخزن</div></div></div>';
+   h+='<table style="width:100%;border-collapse:collapse;margin:14px 0;font-size:16px"><tr><td style="padding:6px 0"><b>رقم الطلب:</b> <span dir="ltr">'+esc(o.no||'')+'</span></td><td><b>التاريخ:</b> <span dir="ltr">'+esc(dt)+'</span></td></tr><tr><td style="padding:6px 0"><b>الزبون:</b> '+esc(c.name||'—')+'</td><td><b>المدينة:</b> '+esc(c.city||'—')+(c.tel?' &nbsp; <b>الهاتف:</b> <span dir="ltr">'+esc(c.tel)+'</span>':'')+'</td></tr></table>'}
+  else h+='<div style="display:flex;justify-content:space-between;border-bottom:2px solid #2e1838;padding-bottom:8px;margin-bottom:14px;font-size:16px"><b>فاتورة تجهيز للمخزن — طلب رقم <span dir="ltr">'+esc(o.no||'')+'</span></b><span>'+esc(c.name||'')+'</span></div>';
+  if(rows.length){h+='<table style="width:100%;border-collapse:collapse;font-size:17px;text-align:center">'+th+rows.map(function(r){var l=r[1],z=r[0]%2?'#f6f1f4':'#fff';return '<tr style="background:'+z+';height:42px"><td style="border:1px solid #bbb">'+(r[0]+1)+'</td><td style="border:1px solid #bbb;text-align:right;padding:0 8px;font-weight:700" dir="ltr">'+esc(l.code)+(l.name?' <span style="font-weight:400;font-size:14px">'+esc(l.name)+'</span>':'')+'</td><td style="border:1px solid #bbb" dir="ltr">'+esc(l.sizes||'')+'</td><td style="border:1px solid #bbb;font-weight:800">'+l.q+'</td><td style="border:1px solid #bbb">'+l.pcs+'</td><td style="border:1px solid #bbb"><span style="display:inline-block;width:24px;height:24px;border:2px solid #333;border-radius:4px;vertical-align:middle"></span></td></tr>'}).join('')+'</table>'}
+  if(pi===N-1){h+='<div style="display:flex;gap:14px;margin-top:18px;font-size:18px"><div style="flex:1;border:2px solid #2e1838;border-radius:10px;padding:10px;text-align:center">📦 إجمالي الكراتين: <b>'+(T.c||0)+'</b></div><div style="flex:1;border:2px solid #2e1838;border-radius:10px;padding:10px;text-align:center">👟 إجمالي القطع: <b>'+(T.p||0)+'</b></div></div>';
+   if(c.note)h+='<div style="margin-top:12px;font-size:15px"><b>ملاحظات الزبون:</b> '+esc(c.note)+'</div>';
+   h+='<div style="display:flex;gap:40px;margin-top:40px;font-size:16px"><div style="flex:1">اسم المجهّز: ............................<br><br>التوقيع: ............................</div><div style="flex:1">تاريخ التجهيز: ......../......../........<br><br>توقيع المستلم: ............................</div></div>'}
+  h+='<div style="position:absolute;bottom:22px;left:46px;right:46px;text-align:center;font-size:13px;color:#666">صفحة '+(pi+1)+' من '+N+'</div></div>';return h})}
+function prepStorePdf(id){var o=orders.filter(function(x){return x.id===id})[0];if(!o)return;toast('جارٍ تجهيز ملف PDF…',3000);
+ var w=document.createElement('div');w.style.cssText='position:fixed;left:-10000px;top:0';w.innerHTML=a4Pages(o).join('');document.body.appendChild(w);
+ Promise.all([h2i(),jspdfLib()]).then(function(r){var H=r[0],J=r[1],doc=new J.jsPDF({unit:'mm',format:'a4'}),pg=[].slice.call(w.children),op={pixelRatio:2,skipFonts:true,backgroundColor:'#fff',quality:.92};
+  return pg.reduce(function(pr,el,k){return pr.then(function(){return H.toJpeg(el,op).then(function(){return H.toJpeg(el,op)}).then(function(u){if(k)doc.addPage();doc.addImage(u,'JPEG',0,0,210,297)})})},Promise.resolve()).then(function(){return doc.output('blob')})
+ }).then(function(b){w.remove();pdfReady[id]=new File([b],'تجهيز-المخزن-'+o.no+'.pdf',{type:'application/pdf'});render();toast('ملف PDF جاهز — اضغط الزر مرة ثانية لفتحه',3500)
+ }).catch(function(e){console.error(e);w.remove();toast('تعذّر تجهيز الملف. تأكد من الإنترنت وحاول مرة أخرى.',4000)})}
+function shareStorePdf(id){var f=pdfReady[id];if(!f)return;
+ if(navigator.canShare&&navigator.canShare({files:[f]})){navigator.share({files:[f]}).catch(function(){});return}
+ var u=URL.createObjectURL(f),a=document.createElement('a');a.href=u;a.download=f.name;document.body.appendChild(a);a.click();a.remove();toast('تم حفظ ملف PDF',3500)}
 var lastOrder=null;
 function flat(L){return L.map(function(l){return {id:l.p.id,code:l.p.code,name:l.p.name||'',sizes:l.p.sizes,pack:l.p.pack,price:l.p.price,q:l.q,pcs:l.pcs,tot:l.tot}})}
 function openInvoice(){
@@ -461,6 +487,7 @@ function orderCard(o){
  '<div class="grandl"><span>المبلغ</span><b><span class="num">'+money(T.t)+'</span> د.ل · '+(T.c||0)+' كرتونة</b></div>'+
  (o.status!=='rejected'?'<button class="btn invimg" data-invimg="'+o.id+'" type="button">'+(invReady[o.id]?'✅ الصورة جاهزة — اضغط لإرسالها للزبون':'🧾 إرسال صورة الفاتورة للزبون')+'</button>':'')+
  (o.status!=='rejected'?prepInfo(o.id,(o.lines||[]).length):'')+
+ (o.status!=='rejected'?'<button class="btn invimg pdfbtn" data-storepdf="'+o.id+'" type="button">'+(pdfReady[o.id]?'✅ ملف PDF جاهز — اضغط لفتحه أو طباعته':'🖨️ فاتورة المخزن PDF للطباعة (A4)')+'</button>':'')+
  (o.status!=='rejected'?'<a class="wa store" href="'+storeLink(o)+'" target="_blank" rel="noopener" data-store="'+o.id+'">📦 إرسال للمخزن للتجهيز'+(o.sentToStore?' (أُرسل ✓)':'')+'</a>':'')+
  (o.status==='new'?'<div class="two-b"><button class="btn acc" data-accept="'+o.id+'" type="button">قبول وإرسال رد للزبون</button><button class="btn ghost" data-reject="'+o.id+'" type="button">رفض وإرجاع الكمية</button></div>':
   '<div class="two-b"><a class="wa2" href="'+waLink(o,o.status==='accepted')+'" target="_blank" rel="noopener">مراسلة الزبون على الواتساب</a></div>')+
@@ -667,6 +694,7 @@ document.addEventListener('click',function(e){
  if(ds.otab){ordTab=ds.otab;render();scrollTo(0,0);return}
  if(ds.store){try{fb.fs.updateDoc(fb.fs.doc(db,'orders',ds.store),{sentToStore:true})}catch(er){}return}
  if(ds.prep!=null&&storeMode){togglePrep(+ds.prep);return}
+ if(ds.storepdf){if(pdfReady[ds.storepdf])shareStorePdf(ds.storepdf);else prepStorePdf(ds.storepdf);return}
  if(ds.invimg){if(invReady[ds.invimg])shareInvImg(ds.invimg);else prepInvImg(ds.invimg);return}
  if(ds.accept){acceptOrder(ds.accept);return}
  if(ds.reject){if(ds.sure)rejectOrder(ds.reject);else{ds.sure='1';t.textContent='اضغط مرة ثانية لتأكيد الرفض'}return}
