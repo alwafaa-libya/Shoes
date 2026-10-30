@@ -396,9 +396,10 @@ function renderAdmin(){
   if(live&&D.fromDb&&D.products.some(function(p){return !p._dirty}))h+='<div class="scanbox"><div><b>🗑️ حذف كل الأصناف</b><span>يحذف كل الأصناف وصورها من الموقع نهائياً، لتبدأ من جديد بملف إكسل وصور جديدة. الطلبات السابقة لا تُحذف.</span></div><button class="btn ghost" id="delAll" type="button" style="color:#b3261e;border-color:#b3261e">حذف الكل</button></div>';
   if((!live||!D.fromDb)&&SEED.length)h+='<div class="scanbox"><div><b>الأصناف ليست في قاعدة البيانات بعد</b><span>اضغط الزر مرة واحدة لنقل الأصناف الحالية مع صورها وكمياتها إلى قاعدة البيانات. بعدها يصبح المخزون مشتركاً لكل الزبائن.</span></div><button class="scan" id="seed" type="button">نقل الأصناف</button></div>';
   if(D.fromDb)h+='<div class="scanbox"><div><b>📷 أصناف من الصور</b><span>اختر صورة أو عدة صور. إذا كان اسم ملف الصورة هو رقم الصنف (مثل DT-261084.jpg أو DT-261084 (2).jpg) تُضاف للصنف مباشرة. وإلا يقرأ النظام رقم الصنف من الصورة نفسها، فإن وجده أضافها له، وإلا أنشأ صنفاً جديداً.</span></div><label class="scan'+(aiBusy?' busy':'')+'" for="aiIn">'+(aiBusy?'جارٍ قراءة الصور وحفظها… باقي '+aiBusy+' — أبقِ الصفحة مفتوحة':'اختر الصور')+'</label></div>';
+  if(D.fromDb){var cs=chkSum();h+='<div class="scanbox chkbox"><div><b>🔍 مطابقة الصور مع أرقام الأصناف</b><span>يقرأ النظام الرقم المكتوب على الصورة الرئيسية لكل صنف ويقارنه برقم الصنف المسجّل. '+(cs.t?'النتيجة: ✅ مطابق '+cs.ok+' — ⚠️ غير مطابق '+cs.bad+' — ❔ لم يُقرأ '+cs.none:'')+'</span></div><div class="xbtns"><button class="scan'+(chkBusy?' busy':'')+'" id="chkAll" type="button"'+(chkBusy||aiBusy?' disabled':'')+'>'+(chkBusy?'جارٍ الفحص… باقي '+chkBusy:'افحص كل الأصناف')+'</button>'+(cs.bad+cs.none?'<button class="btn ghost" id="chkOnly" type="button">'+(chkOnly?'عرض كل الأصناف':'عرض غير المطابق فقط ('+(cs.bad+cs.none)+')')+'</button>':'')+'</div></div>'}
   var nd=D.products.filter(function(p){return p._dirty}).length;if(nd)h+='<div class="savebar"><span>'+nd+' صنف فيه تعديلات غير محفوظة</span><button class="btn acc" id="saveAll" type="button">حفظ الكل</button></div>';
   if(D.fromDb)h+='<div class="scanbox"><div><b>استيراد الأصناف من إكسل</b><span>رقم الصنف، الاسم، المقاسات، العبوة، السعر، والكمية. الأصناف الموجودة تتحدّث، والجديدة تُضاف. الصور تضيفها باليد بعد ذلك.</span></div><div class="xbtns"><label class="scan" for="xlsIn">اختر ملف الإكسل</label><button class="btn ghost" id="xlsTpl" type="button">تنزيل النموذج</button></div></div>';
-  h+='<div class="grid">'+D.products.map(editCard).join('')+'<button class="newcard" id="addProd" type="button">+ صنف جديد</button></div>';
+  h+='<div class="grid">'+D.products.filter(function(p){return !chkOnly||p._dirty||(chk[p.id]&&chk[p.id].s!=='ok')}).map(editCard).join('')+'<button class="newcard" id="addProd" type="button">+ صنف جديد</button></div>';
   h+='<p class="note">كل صنف يُحفظ بزر «حفظ» الخاص به، ويظهر التعديل للزبائن فوراً.</p>';
  }
  h+='</div>';app.innerHTML=h;
@@ -430,7 +431,11 @@ function storeText(o){var c=o.customer||{},T=o.totals||{},L=o.lines||[],t=[],sep
 function storeLink(o){var n=waOf(storeNum());return (n.length>=9?'https://wa.me/'+n:'https://wa.me/')+'?text='+encodeURIComponent(storeText(o))}
 function editCard(p){
  var th=(p.images||[]).map(function(src,i){return '<div class="t'+(i===0?' main':'')+'"><img src="'+src+'" alt=""><button data-rmimg="'+p.id+'" data-i="'+i+'" type="button" aria-label="حذف الصورة">×</button>'+(i?'<button class="mk" data-mainimg="'+p.id+'" data-i="'+i+'" type="button" aria-label="اجعلها الرئيسية">★</button>':'')+'</div>'}).join('');
- return '<article class="card'+(p._dirty?' dirty':'')+'"><div class="ed"><div class="thumbs">'+th+'<label class="upl" title="إضافة صور" for="cardIn" data-pick="'+p.id+'">+</label></div>'+
+ var ck=chk[p.id],bd='';
+ if(ck)bd=ck.s==='ok'?'<div class="chk ok">✅ الصورة مطابقة لرقم الصنف</div>':
+  ck.s==='bad'?'<div class="chk bad">⚠️ غير مطابق: المكتوب على الصورة <bdi dir="ltr" class="rc">'+esc(ck.r)+'</bdi><button class="btn ghost" data-usecode="'+p.id+'" type="button">اجعله رقم الصنف</button></div>':
+  '<div class="chk none">❔ لم يُقرأ رقم واضح على الصورة — راجعها بعينك</div>';
+ return '<article class="card'+(p._dirty?' dirty':'')+(ck&&ck.s!=='ok'?' warncard':'')+'">'+bd+'<div class="ed"><div class="thumbs">'+th+'<label class="upl" title="إضافة صور" for="cardIn" data-pick="'+p.id+'">+</label></div>'+
  '<label>رقم الصنف<input data-f="code" data-id="'+p.id+'" value="'+esc(p.code)+'"></label>'+
  '<label>اسم الصنف<input data-f="name" data-id="'+p.id+'" value="'+esc(p.name||'')+'"></label>'+
  '<label>المقاسات<input data-f="sizes" data-id="'+p.id+'" value="'+esc(p.sizes)+'"></label>'+
@@ -499,6 +504,17 @@ function aiApply(p,r,force){var got=0;if(!r)return 0;
 function ckey(x){return String(x||'').toLowerCase().replace(/[^a-z0-9]/g,'')}
 function findCode(code){var c=ckey(code),hit=null;if(!c)return null;D.products.forEach(function(p){if(!hit&&ckey(p.code)===c)hit=p});return hit}
 function byName(n){var b=String(n||'').replace(/\.[^.]+$/,'').trim();return findCode(b)||findCode(b.replace(/(\s*\(\d+\)|[\s_]+\d{1,2})$/,''))}
+var chk={},chkBusy=0,chkOnly=false;
+function chkSum(){var r={t:0,ok:0,bad:0,none:0};for(var k in chk){if(!find(k))continue;r.t++;r[chk[k].s==='ok'?'ok':chk[k].s==='bad'?'bad':'none']++}return r}
+function codeMatch(a,b){a=ckey(a);b=ckey(b);return !!a&&!!b&&(a===b||(a.length>=5&&b.length>=5&&(a.indexOf(b)>=0||b.indexOf(a)>=0)))}
+function checkAll(){var L=D.products.filter(function(p){return p.images&&p.images.length});if(!L.length){toast('لا توجد أصناف فيها صور');return}
+ chk={};chkOnly=false;chkBusy=L.length;wake(true);render();var chain=Promise.resolve();
+ L.forEach(function(p){chain=chain.then(function(){return aiRead(p.images[0]).then(function(r){var rc=r&&r.code;
+   chk[p.id]=!rc?{s:'none'}:(codeMatch(rc,p.code)||codeMatch(rc,p.name))?{s:'ok',r:rc}:{s:'bad',r:rc}},
+  function(e){console.error(e);chk[p.id]={s:'none'}}).then(function(){chkBusy--;render()})})});
+ chain.then(function(){chkBusy=0;wake(false);var c=chkSum();if(c.bad+c.none)chkOnly=true;render();
+  toast(c.bad+c.none?'انتهى الفحص: '+c.bad+' غير مطابق و'+c.none+' لم يُقرأ. أعرضها لك الآن.':'انتهى الفحص: كل الصور مطابقة ✅',7000);
+  var w=document.querySelector('.warncard');if(w)w.scrollIntoView({block:'center'})})}
 function saveOne(p){var d=clean(p);if(JSON.stringify(d).length>950000)return Promise.reject({big:1});
  return fb.fs.setDoc(fb.fs.doc(db,'products',p.id),d).then(function(){p._dirty=false})}
 var wakeL=null;function wake(on){try{if(on&&navigator.wakeLock&&!wakeL)navigator.wakeLock.request('screen').then(function(w){wakeL=w;w.addEventListener('release',function(){wakeL=null})},function(){});else if(!on&&wakeL){wakeL.release();wakeL=null}}catch(e){}}
@@ -580,7 +596,8 @@ document.addEventListener('click',function(e){
  if(ds.savep){var sp=find(ds.savep);sp._dirty=false;saveProduct(sp);return}
  if(ds.delp){if(ds.sure){var dp=ds.delp;fb.fs.deleteDoc(fb.fs.doc(db,'products',dp)).then(function(){toast('تم حذف الصنف')},function(er){toast(permMsg(er))})}else{ds.sure='1';t.textContent='اضغط مرة ثانية لتأكيد الحذف'}return}
  if(ds.rmimg){var rp=find(ds.rmimg);rp.images.splice(+ds.i,1);rp._dirty=true;render();return}
- if(ds.mainimg){var mp=find(ds.mainimg),x=mp.images.splice(+ds.i,1)[0];mp.images.unshift(x);mp._dirty=true;render();return}
+ if(ds.usecode){var up=find(ds.usecode),uk=chk[ds.usecode];if(up&&uk&&uk.r){up.code=uk.r;up._dirty=true;uk.s='ok';render();toast('تم تغيير الرقم إلى '+uk.r+' — اضغط «حفظ» للصنف')}return}
+  if(ds.mainimg){var mp=find(ds.mainimg),x=mp.images.splice(+ds.i,1)[0];mp.images.unshift(x);mp._dirty=true;render();return}
  switch(t.id){
   case 'openCart':case 'openCart2':case 'backCart':openCart();return;
   case 'clearCart':if(ds.sure){cart={};curInv=null;saveCart();closeSheets();render()}else{ds.sure='1';t.textContent='اضغط مرة ثانية للتأكيد'}return;
@@ -598,6 +615,8 @@ document.addEventListener('click',function(e){
    return;
   case 'xlsTpl':xlTemplate();return;
   case 'saveAll':saveAll();return;
+  case 'chkAll':if(!fbApp){toast('انتظر حتى يتصل النظام بالإنترنت');return}checkAll();return;
+  case 'chkOnly':chkOnly=!chkOnly;render();return;
   case 'xlGo':xlSave();return;
   case 'addProd':var np={id:'p'+Date.now().toString(36),code:'صنف جديد',sizes:'',pack:18,price:50,stock:0,images:[],order:D.products.length+1,_dirty:true};D.products.push(np);render();return;
   case 'forgot':var em=(document.getElementById('lEmail').value||'').trim();if(!em){toast('اكتب بريدك الإلكتروني أولاً');return}fb.auth.sendPasswordResetEmail(auth,em).then(function(){toast('أرسلنا رابط تغيير كلمة السر إلى بريدك',4000)},function(){toast('تعذّر الإرسال. تأكد من البريد.')});return;
@@ -646,6 +665,10 @@ Promise.all([import(G+'firebase-app.js'),import(G+'firebase-firestore.js'),impor
 <ol class="it-steps"></ol>
 </div>
 <style>
+.chk{margin:0 0 8px;padding:8px 10px;border-radius:10px;font-size:13.5px;line-height:1.6}
+.chk.ok{background:#e7f5ee;color:#1f7a4d}.chk.bad{background:#fdecea;color:#b3261e}.chk.none{background:#fff4e0;color:#8a4b00}
+.chk .rc{display:inline-block;white-space:nowrap;font-weight:700}.chk .btn{display:block;margin-top:6px;font-size:13px;padding:6px 10px}
+.card.warncard{outline:2px solid #b3261e}
 #installTip{position:fixed;left:10px;right:10px;bottom:calc(10px + env(safe-area-inset-bottom,0px));z-index:70;background:var(--surface,#fff);color:var(--ink,#2e1838);border:1px solid var(--line,#ead4de);border-top:4px solid var(--accent,#b4245f);border-radius:14px;box-shadow:0 10px 30px rgba(0,0,0,.25);padding:12px 14px 10px;font-family:var(--f-body,Tahoma,sans-serif);direction:rtl;max-width:480px;margin:0 auto}
 #installTip .it-row{display:flex;gap:10px;align-items:center;padding-left:26px}
 #installTip .it-ic{width:44px;height:44px;border-radius:10px;flex:none;border:1px solid var(--line,#ead4de)}
