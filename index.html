@@ -168,6 +168,7 @@ label.f input,label.f textarea{border:1.5px solid var(--line);border-radius:10px
 .ptot .grand b{font-size:1.25rem}
 .pfoot{margin:10px 0 0;font-size:.78rem;color:var(--muted);text-align:center}
 .wa.off,.wa2.off{opacity:.55}
+.invimg{display:block;width:100%;margin:10px 0 0;background:var(--ok);color:#fff;border:0;font-weight:700;padding:11px;border-radius:12px;font-size:.95rem}
 .wa2{display:block;text-align:center;border:1.5px solid var(--ok);color:var(--ok);text-decoration:none;font-weight:700;padding:10px;border-radius:12px;font-size:.92rem}
 .shopset{grid-column:1/-1;display:flex;flex-wrap:wrap;gap:10px;background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:12px 16px}
 .shopset label{flex:1;min-width:180px;display:flex;flex-direction:column;font-size:.8rem;color:var(--muted)}
@@ -323,6 +324,16 @@ function saveImg(no){var pa=document.getElementById('paper2');if(!pa)return;toas
   if(navigator.canShare&&navigator.canShare({files:[f]})){navigator.share({files:[f]}).catch(function(){});return}
   var u=URL.createObjectURL(f),a=document.createElement('a');a.href=u;a.download=f.name;document.body.appendChild(a);a.click();a.remove();toast('تم حفظ صورة الفاتورة')
  }).catch(function(){toast('تعذّر حفظ الصورة. استعمل «لقطة شاشة» بدلاً منها.',4000)})}
+var invReady={};
+function prepInvImg(id){var o=orders.filter(function(x){return x.id===id})[0];if(!o)return;toast('جارٍ تجهيز صورة الفاتورة…');
+ var w=document.createElement('div');w.style.cssText='position:fixed;left:-10000px;top:0;width:430px';w.setAttribute('dir','rtl');w.innerHTML=paperHtml(o).replace('id="paper2"','id="paperX"');document.body.appendChild(w);
+ var pa=w.firstChild;pa.style.margin='0';
+ h2i().then(function(H){var op={pixelRatio:2,skipFonts:true,backgroundColor:getComputedStyle(pa).backgroundColor||'#fff'};return H.toBlob(pa,op).then(function(){return H.toBlob(pa,op)})}).then(function(b){
+  w.remove();invReady[id]=new File([b],'فاتورة-'+o.no+'.png',{type:'image/png'});render();toast('الصورة جاهزة — اضغط الزر مرة ثانية لإرسالها',3500)
+ }).catch(function(){w.remove();toast('تعذّر تجهيز الصورة. تأكد من الإنترنت وحاول مرة أخرى.',4000)})}
+function shareInvImg(id){var f=invReady[id];if(!f)return;
+ if(navigator.canShare&&navigator.canShare({files:[f]})){navigator.share({files:[f]}).catch(function(){});return}
+ var u=URL.createObjectURL(f),a=document.createElement('a');a.href=u;a.download=f.name;document.body.appendChild(a);a.click();a.remove();toast('تم حفظ صورة الفاتورة — أرسلها للزبون من واتساب',4000)}
 var lastOrder=null;
 function flat(L){return L.map(function(l){return {id:l.p.id,code:l.p.code,name:l.p.name||'',sizes:l.p.sizes,pack:l.p.pack,price:l.p.price,q:l.q,pcs:l.pcs,tot:l.tot}})}
 function openInvoice(){
@@ -423,6 +434,7 @@ function orderCard(o){
  '<div class="pcust"><div><span>الزبون</span><b>'+esc(c.name||'—')+'</b></div><div><span>المدينة</span><b>'+esc(c.city||'—')+'</b></div><div><span>الهاتف</span><b class="num">'+esc(c.tel||'—')+'</b></div>'+(c.note?'<div class="wide"><span>ملاحظات</span><b>'+esc(c.note)+'</b></div>':'')+'</div>'+
  invTable(o.lines||[])+
  '<div class="grandl"><span>المبلغ</span><b><span class="num">'+money(T.t)+'</span> د.ل · '+(T.c||0)+' كرتونة</b></div>'+
+ (o.status!=='rejected'?'<button class="btn invimg" data-invimg="'+o.id+'" type="button">'+(invReady[o.id]?'✅ الصورة جاهزة — اضغط لإرسالها للزبون':'🧾 إرسال صورة الفاتورة للزبون')+'</button>':'')+
  (o.status!=='rejected'?'<a class="wa store" href="'+storeLink(o)+'" target="_blank" rel="noopener" data-store="'+o.id+'">📦 إرسال للمخزن للتجهيز'+(o.sentToStore?' (أُرسل ✓)':'')+'</a>':'')+
  (o.status==='new'?'<div class="two-b"><button class="btn acc" data-accept="'+o.id+'" type="button">قبول وإرسال رد للزبون</button><button class="btn ghost" data-reject="'+o.id+'" type="button">رفض وإرجاع الكمية</button></div>':
   '<div class="two-b"><a class="wa2" href="'+waLink(o,o.status==='accepted')+'" target="_blank" rel="noopener">مراسلة الزبون على الواتساب</a></div>')+
@@ -603,6 +615,7 @@ document.addEventListener('click',function(e){
  if(ds.dec){cart[ds.dec]=Math.max(0,(cart[ds.dec]||0)-1);if(!cart[ds.dec])delete cart[ds.dec];curInv=null;saveCart();render();return}
  if(ds.tab){adminTab=ds.tab;render();return}
  if(ds.store){try{fb.fs.updateDoc(fb.fs.doc(db,'orders',ds.store),{sentToStore:true})}catch(er){}return}
+ if(ds.invimg){if(invReady[ds.invimg])shareInvImg(ds.invimg);else prepInvImg(ds.invimg);return}
  if(ds.accept){acceptOrder(ds.accept);return}
  if(ds.reject){if(ds.sure)rejectOrder(ds.reject);else{ds.sure='1';t.textContent='اضغط مرة ثانية لتأكيد الرفض'}return}
  if(ds.readai){readCard(find(ds.readai));return}
