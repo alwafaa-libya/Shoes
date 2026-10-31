@@ -208,6 +208,9 @@ label.f input,label.f textarea{border:1.5px solid var(--line);border-radius:10px
 .prepi .box{flex:none;width:34px;height:34px;border-radius:9px;border:2.5px solid var(--muted);display:grid;place-items:center;font-size:22px;font-weight:900;color:#fff}
 .prepi.on{border-color:var(--ok);background:#eef9f2}.prepi.on .box{background:var(--ok);border-color:var(--ok)}
 .prepi .pt{display:flex;flex-direction:column}.prepi small{color:var(--muted);font-size:.85rem}
+.obar{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:0 0 12px}.obar .btn{font-size:.85rem;padding:9px 6px;border:1.5px solid var(--line)}
+.dng{color:#b3261e!important;border-color:#e8b4b0!important}
+.delo{display:block;margin:10px auto 0;background:none;border:0;color:#b3261e;font-weight:700;font-size:.85rem;padding:6px 10px}
 .otabs{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin:0 0 14px}
 .otab{border:1.5px solid var(--line);background:var(--surface);color:var(--muted);border-radius:12px;padding:9px 4px;font-weight:700;font-size:.85rem;line-height:1.4}
 .otab span{display:block;font-size:1.05rem}
@@ -464,6 +467,7 @@ function renderAdmin(){
    var lb={new:'🆕 الجديدة',accepted:'✅ الموافق عليها',rejected:'❌ المرفوضة'};
    h+='<div class="otabs">'+['new','accepted','rejected'].map(function(k){return '<button class="otab'+(ordTab===k?' on':'')+' k-'+k+'" data-otab="'+k+'" type="button">'+lb[k]+' <span class="num">'+G[k].length+'</span></button>'}).join('')+'</div>';
    var LS=G[ordTab]||[];
+   if(LS.length)h+='<div class="obar"><button class="btn ghost" data-xlord="'+ordTab+'" type="button">📥 تنزيل نسخة إكسل</button><button class="btn ghost dng" data-clear="'+ordTab+'" type="button">🗑️ تفريغ هذا القسم</button></div>';
    if(!LS.length)h+='<p class="empty">'+(ordTab==='new'?'لا توجد طلبات جديدة. كل الطلبات تمت مراجعتها 👍':ordTab==='accepted'?'لا توجد فواتير موافق عليها بعد.':'لا توجد طلبات مرفوضة.')+'</p>';
    h+='<div class="olist">'+LS.map(orderCard).join('')+'</div>';
   }
@@ -491,6 +495,7 @@ function orderCard(o){
  (o.status!=='rejected'?'<a class="wa store" href="'+storeLink(o)+'" target="_blank" rel="noopener" data-store="'+o.id+'">📦 إرسال للمخزن للتجهيز'+(o.sentToStore?' (أُرسل ✓)':'')+'</a>':'')+
  (o.status==='new'?'<div class="two-b"><button class="btn acc" data-accept="'+o.id+'" type="button">قبول وإرسال رد للزبون</button><button class="btn ghost" data-reject="'+o.id+'" type="button">رفض وإرجاع الكمية</button></div>':
   '<div class="two-b"><a class="wa2" href="'+waLink(o,o.status==='accepted')+'" target="_blank" rel="noopener">مراسلة الزبون على الواتساب</a></div>')+
+ '<button class="delo" data-delo="'+o.id+'" type="button">🗑️ حذف الفاتورة</button>'+
  '</article>';
 }
 function waLink(o,ok){var c=o.customer||{},T=o.totals||{};
@@ -565,6 +570,26 @@ function acceptOrder(id){
  fb.fs.updateDoc(fb.fs.doc(db,'orders',id),{status:'accepted',doneAt:fb.fs.serverTimestamp()}).catch(function(e){console.error(e);toast(permMsg(e))});
  if(!w)location.href=waLink(o,true);
 }
+var SLB={new:'جديد',accepted:'موافق عليه',rejected:'مرفوض'};
+function delOne(o){var F=fb.fs;
+ if(o.status==='new')return F.runTransaction(db,function(tx){
+  var L=o.lines||[],refs=L.map(function(l){return F.doc(db,'products',l.id||'x')}),oref=F.doc(db,'orders',o.id);
+  return Promise.all([tx.get(oref)].concat(refs.map(function(r){return tx.get(r)}))).then(function(sn){
+   if(!sn[0].exists())return;
+   if(sn[0].data().status==='new')sn.slice(1).forEach(function(ps,i){if(ps.exists())tx.update(refs[i],{stock:(ps.data().stock||0)+(L[i].q||0)})});
+   tx.delete(oref);tx.delete(F.doc(db,'prep',o.id));
+  })});
+ var b=F.writeBatch(db);b.delete(F.doc(db,'orders',o.id));b.delete(F.doc(db,'prep',o.id));return b.commit()}
+function delOrders(list,btn){if(!list.length)return;if(btn){btn.disabled=true;btn.textContent='جارٍ الحذف…'}
+ var done=0;list.reduce(function(pr,o){return pr.then(function(){return delOne(o).then(function(){done++})})},Promise.resolve())
+ .then(function(){toast(done===1?'تم حذف الفاتورة':'تم حذف '+done+' فاتورة'+(list.some(function(o){return o.status==='new'})?' وإرجاع كميات الطلبات الجديدة للمخزون':''),4000)},
+  function(e){console.error(e);toast(permMsg(e)+(done?' (حُذف '+done+')':''),4500);render()})}
+function xlOrders(k){var L=orders.filter(function(o){return (o.status||'new')===k});if(!L.length)return;
+ xlsx().then(function(X){var rows=[['رقم الفاتورة','التاريخ','الحالة','الزبون','المدينة','الهاتف','رقم الصنف','اسم الصنف','المقاس','الكراتين','القطع','سعر القطعة','الإجمالي','ملاحظات']];
+  L.forEach(function(o){var c=o.customer||{};(o.lines||[]).forEach(function(l){rows.push([o.no||'',o.date||fmtTime(o.createdAt)||'',SLB[o.status]||'',c.name||'',c.city||'',c.tel||'',l.code||'',l.name||'',l.sizes||'',l.q||0,l.pcs||0,l.price||0,l.tot||0,c.note||''])})});
+  var ws=X.utils.aoa_to_sheet(rows);ws['!cols']=[{wch:14},{wch:12},{wch:11},{wch:18},{wch:12},{wch:14},{wch:16},{wch:18},{wch:10},{wch:9},{wch:8},{wch:11},{wch:11},{wch:20}];
+  var wb=X.utils.book_new();X.utils.book_append_sheet(wb,ws,'الفواتير');X.writeFile(wb,'فواتير-'+(SLB[k]||k)+'-'+today().replace(/\//g,'-')+'.xlsx');toast('تم تنزيل نسخة الإكسل',3000)
+ },function(){toast('تعذّر تحميل أداة الإكسل. تأكد من الإنترنت.')})}
 function rejectOrder(id){
  var o=orders.filter(function(x){return x.id===id})[0];if(!o)return;var F=fb.fs;
  F.runTransaction(db,function(tx){
@@ -696,6 +721,13 @@ document.addEventListener('click',function(e){
  if(ds.prep!=null&&storeMode){togglePrep(+ds.prep);return}
  if(ds.storepdf){if(pdfReady[ds.storepdf])shareStorePdf(ds.storepdf);else prepStorePdf(ds.storepdf);return}
  if(ds.invimg){if(invReady[ds.invimg])shareInvImg(ds.invimg);else prepInvImg(ds.invimg);return}
+ if(ds.xlord){xlOrders(ds.xlord);return}
+ if(ds.clear){var CL=orders.filter(function(o){return (o.status||'new')===ds.clear});if(!CL.length)return;
+  if(!ds.sure){ds.sure='1';t.textContent='متأكد؟ سيُحذف '+CL.length+' فاتورة نهائياً — اضغط للتأكيد';return}
+  delOrders(CL,t);return}
+ if(ds.delo){var DO=orders.filter(function(o){return o.id===ds.delo})[0];if(!DO)return;
+  if(!ds.sure){ds.sure='1';t.textContent='متأكد؟ اضغط مرة ثانية للحذف النهائي'+(DO.status==='new'?' (ستُرجع الكمية للمخزون)':'');return}
+  delOrders([DO],t);return}
  if(ds.accept){acceptOrder(ds.accept);return}
  if(ds.reject){if(ds.sure)rejectOrder(ds.reject);else{ds.sure='1';t.textContent='اضغط مرة ثانية لتأكيد الرفض'}return}
  if(ds.readai){readCard(find(ds.readai));return}
