@@ -458,8 +458,12 @@ function renderAdmin(){
   h+='<form class="login" id="loginF"><h2>دخول المالك</h2><label class="f">البريد الإلكتروني<input id="lEmail" type="email" dir="ltr" autocomplete="username" required></label><label class="f">كلمة السر<input id="lPass" type="password" dir="ltr" autocomplete="current-password" required></label><p class="err" id="lErr" hidden></p><button class="btn acc lg" type="submit">دخول</button><button class="linkb" id="forgot" type="button">نسيت كلمة السر؟</button></form></div>';
   app.innerHTML=h;return}
  var nNew=orders.filter(function(o){return o.status==='new'}).length;
- h+='<div class="tabs"><button class="tab'+(adminTab==='orders'?' on':'')+'" data-tab="orders" type="button">الطلبات'+(nNew?' <span class="bdg num">'+nNew+'</span>':'')+'</button><button class="tab'+(adminTab==='stock'?' on':'')+'" data-tab="stock" type="button">البضاعة والمخزون</button></div>';
- if(adminTab==='orders'){
+ h+='<div class="tabs"><button class="tab'+(adminTab==='orders'?' on':'')+'" data-tab="orders" type="button">الطلبات'+(nNew?' <span class="bdg num">'+nNew+'</span>':'')+'</button><button class="tab'+(adminTab==='stock'?' on':'')+'" data-tab="stock" type="button">البضاعة والمخزون</button><button class="tab'+(adminTab==='shop'?' on':'')+'" data-tab="shop" type="button">المتجر</button></div>';
+ if(adminTab==='shop'){
+  var shown=D.products.filter(function(p){return p.stock>0&&p.price>0}),hid=D.products.length-shown.length;
+  h+='<div class="scanbox"><div><b>👁️ هكذا يرى الزبائن المتجر</b><span>'+shown.length+' صنف ظاهر للزبائن'+(hid?' — و'+hid+' صنف مخفي (بدون سعر أو بدون كمية)':'')+'. اضغط على أي صورة لتكبيرها.</span></div><a class="scan" href="https://alwafaa-libya.github.io/Shoes/" target="_blank" rel="noopener">فتح صفحة الزبائن</a></div>';
+  h+='<div class="grid pv">'+(shown.length?shown.map(shopCard).join(''):'<p class="empty">لا توجد أصناف ظاهرة للزبائن.</p>')+'</div>';
+ }else if(adminTab==='orders'){
   h+='<div class="storeset"><label>رقم واتساب المخزن<input id="storeNum" type="tel" dir="ltr" inputmode="tel" placeholder="09xxxxxxxx" value="'+esc(storeNum())+'"></label><small>يُحفظ على هذا الجهاز. إذا تركته فارغاً، يسألك الواتساب لمن ترسل (شخص أو مجموعة).</small></div>';
   if(ordersErr)h+='<p class="err">'+esc(ordersErr)+'</p>';
   else if(!orders.length)h+='<p class="empty">لا توجد طلبات بعد. أي طلب يرسله زبون يظهر هنا فوراً.</p>';
@@ -827,6 +831,7 @@ Promise.all([import(G+'firebase-app.js'),import(G+'firebase-firestore.js'),impor
 <ol class="it-steps"></ol>
 </div>
 <style>
+.pv .add,.pv .qty{display:none}.scanbox a.scan{text-decoration:none}
 .chk{margin:0 0 8px;padding:8px 10px;border-radius:10px;font-size:13.5px;line-height:1.6}
 .chk.ok{background:#e7f5ee;color:#1f7a4d}.chk.bad{background:#fdecea;color:#b3261e}.chk.none{background:#fff4e0;color:#8a4b00}
 .chk .rc{display:inline-block;white-space:nowrap;font-weight:700}.chk .btn{display:block;margin-top:6px;font-size:13px;padding:6px 10px}
