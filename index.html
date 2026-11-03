@@ -500,11 +500,14 @@ function manDrawLines(){var el=document.getElementById('mLines');if(!el)return;v
   '<div class="cend"><b class="num">'+money(l.tot)+'</b><small>د.ل</small><button class="rm" data-mrm="'+p.id+'" type="button">حذف</button></div></li>'}).join('')+'</ul>'+
  '<div class="sum"><div><span>عدد الأصناف</span><b>'+L.length+'</b></div><div><span>الكراتين</span><b>'+T.c+'</b></div><div><span>القطع</span><b>'+T.p+'</b></div><div class="big"><span>الإجمالي</span><b><span class="num">'+money(T.t)+'</span> د.ل</b></div></div>';
 }
-function manDrawRes(){var el=document.getElementById('mRes');if(!el)return;var q=nrm(man.q);
- var R=D.products.filter(function(p){return p.stock>0&&(!q||nrm(p.code).indexOf(q)>=0||nrm(p.name).indexOf(q)>=0)});
- var n=R.length;R=R.slice(0,q?40:20);
- if(!n){el.innerHTML='<p class="empty sm">'+(q?'لا يوجد صنف متوفر بهذا الرقم أو الاسم.':'لا توجد أصناف متوفرة في المخزون.')+'</p>';return}
- el.innerHTML=(!q?'<p class="note sm">اكتب جزءاً من رقم الصنف للبحث. أول '+R.length+' من '+n+' صنف متوفر:</p>':n>R.length?'<p class="note sm">أول '+R.length+' من '+n+' نتيجة — اكتب الرقم كاملاً لتضييق البحث.</p>':'')+
+function manDrawRes(){var el=document.getElementById('mRes');if(!el)return;var q=nrm(man.q),mc=man.cat||'all';
+ var A=D.products.filter(function(p){return p.stock>0&&(!q||nrm(p.code).indexOf(q)>=0||nrm(p.name).indexOf(q)>=0)});
+ var cn={all:A.length};A.forEach(function(p){if(catName(p.cat))cn[p.cat]=(cn[p.cat]||0)+1;else cn.none=(cn.none||0)+1});
+ var tabs='<div class="mcats">'+[['all','الكل']].concat(CATS).concat(cn.none?[['none','بدون قسم']]:[]).map(function(c){return '<button class="chip'+(mc===c[0]?' on':'')+'" data-mcat="'+c[0]+'" type="button">'+c[1]+' <small class="num">'+(cn[c[0]]||0)+'</small></button>'}).join('')+'</div>';
+ var R=A.filter(function(p){return mc==='all'||(mc==='none'?!catName(p.cat):p.cat===mc)});
+ var z=D.products.filter(function(p){return p.stock<=0}).length;
+ if(!R.length){el.innerHTML=tabs+'<p class="empty sm">'+(q?'لا يوجد صنف متوفر بهذا الرقم أو الاسم.':'لا توجد أصناف متوفرة هنا.')+'</p>';return}
+ el.innerHTML=tabs+'<p class="note sm">'+R.length+' صنف متوفر'+(z?' — ('+z+' صنف كميته صفر لا يظهر هنا)':'')+'</p>'+
  '<ul class="mres">'+R.map(function(p){var inv=man.L[p.id]||0,left=p.stock-inv;
   return '<li><span class="cth">'+(p.images&&p.images[0]?'<img src="'+p.images[0]+'" alt="" loading="lazy">':'')+'</span><div class="cmid"><b class="num">'+esc(p.code)+'</b>'+(p.name?'<small>'+esc(p.name)+'</small>':'')+'<small>مقاس <span class="num">'+esc(p.sizes)+'</span> · المتوفر '+cartons(left)+(p.hidden?' · 🚫 مخفي عن الزبائن':'')+'</small>'+(inv?'<small class="minv">في الفاتورة: '+cartons(inv)+'</small>':'')+'</div>'+
   '<button class="btn acc madd" data-minc="'+p.id+'" type="button"'+(left<=0?' disabled':'')+'>+ كرتونة</button></li>'}).join('')+'</ul>';
@@ -908,6 +911,7 @@ document.addEventListener('click',function(e){
   delOrders([DO],t);return}
  if(ds.accept){acceptOrder(ds.accept);return}
  if(ds.mcancel){if(ds.sure)cancelManual(ds.mcancel);else{ds.sure='1';t.textContent='متأكد؟ اضغط مرة ثانية لإلغاء الفاتورة وإرجاع الكمية'}return}
+ if(ds.mcat&&man){man.cat=ds.mcat;manDrawRes();return}
  if(ds.mbr!=null){var mn=document.getElementById('mName'),mc=document.getElementById('mCity');if(mn){var BC={'الرجالي بنغازي':'بنغازي','المعرض':''},cv=BC.hasOwnProperty(ds.mbr)?BC[ds.mbr]:ds.mbr;if(mc&&(!mc.value||mc.value===mn.value||mc.dataset.auto==='1')){mc.value=cv;mc.dataset.auto='1'}mn.value=ds.mbr;manSync();document.querySelectorAll('[data-mbr]').forEach(function(c){c.classList.toggle('on',c.dataset.mbr===ds.mbr)})}return}
  if(ds.minc||ds.mdec||ds.mrm){manSync();var mi=ds.minc||ds.mdec||ds.mrm;manSet(mi,ds.mrm?0:(man.L[mi]||0)+(ds.minc?1:-1));if(ds.minc&&!ds.mrm&&t.classList.contains('madd')){var mp2=find(mi);if(mp2)toast('أُضيف '+mp2.code+' — '+cartons(man.L[mi]||0))}manDraw();return}
  if(ds.reject){if(ds.sure)rejectOrder(ds.reject);else{ds.sure='1';t.textContent='اضغط مرة ثانية لتأكيد الرفض'}return}
@@ -997,6 +1001,7 @@ Promise.all([import(G+'firebase-app.js'),import(G+'firebase-firestore.js'),impor
 .madd{white-space:nowrap;padding:9px 12px}
 .mqn{width:62px;height:34px;border:1.5px solid var(--line);border-radius:10px;text-align:center;font-weight:900;font-size:1rem;background:var(--bg);color:var(--ink)}
 .mleft{color:var(--muted)}
+.mcats{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0 2px}
 .mbr{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin:0 0 6px;font-size:.85rem;color:var(--muted)}
 .chip{border:1.5px solid var(--line);background:var(--bg);color:var(--ink);border-radius:999px;padding:8px 16px;font-weight:700;font-size:.95rem}.chip.on{background:var(--accent);border-color:var(--accent);color:#fff}
 .empty.sm,.note.sm{font-size:.85rem;margin:6px 0}
