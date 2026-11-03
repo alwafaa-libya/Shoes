@@ -472,6 +472,78 @@ function sendOrder(){
  });
 }
 
+/* ---------- manual invoice (توزيع على الفروع) ---------- */
+var man=null;
+var BRANCHES=['طرابلس','مصراتة','اجدابيا','الرجالي بنغازي','المعرض','البيضاء','طبرق'];
+function manBr(){var S=[];try{S=JSON.parse(localStorage.getItem('wf_branches')||'[]')}catch(e){}return BRANCHES.concat(S.filter(function(x){return BRANCHES.indexOf(x)<0}))}
+function manKeepBr(n){var B=manBr().filter(function(x){return x!==n});B.unshift(n);try{localStorage.setItem('wf_branches',JSON.stringify(B.slice(0,30)))}catch(e){}}
+function manNew(){man={L:{},ord:[],q:'',name:'',city:'',tel:'',note:''}}
+function manLines(){var a=[];man.ord.forEach(function(id){var p=find(id),q=man.L[id];if(p&&q)a.push({p:p,q:q,pcs:q*p.pack,tot:q*p.pack*p.price})});return a}
+function openManual(){if(!man)manNew();var B=manBr();
+ var h='<div class="shd"><h2>🏬 فاتورة يدوية</h2><button class="x" data-close="1" type="button" aria-label="إغلاق">✕</button></div>'+
+ '<p class="note">لتوزيع البضاعة على الفروع: اكتب اسم الفرع، ثم ابحث عن الأصناف وأضف الكراتين. عند الحفظ تنقص الكمية من المخزون مباشرة، وتظهر الفاتورة في قسم «الموافق عليها».</p>'+
+ '<div class="frow"><label class="f">اسم الفرع أو الزبون * <small>(اضغط على الفرع بالأسفل أو اكتب)</small><input id="mName" value="'+esc(man.name)+'"></label><label class="f">رقم الواتساب (اختياري)<input id="mTel" type="tel" inputmode="tel" dir="ltr" placeholder="09xxxxxxxx" value="'+esc(man.tel)+'"></label></div>'+
+ (B.length?'<div class="mbr"><span>الفروع:</span>'+B.map(function(n){return '<button class="chip'+(man.name===n?' on':'')+'" data-mbr="'+esc(n)+'" type="button">'+esc(n)+'</button>'}).join('')+'</div>':'')+
+ '<div class="frow"><label class="f">المدينة<input id="mCity" value="'+esc(man.city)+'"></label><label class="f">ملاحظات<input id="mNote" value="'+esc(man.note)+'"></label></div>'+
+ '<h3 class="mh">الأصناف في الفاتورة</h3><div id="mLines"></div>'+
+ '<h3 class="mh">إضافة صنف</h3><input id="mQ" class="msearch" type="search" placeholder="🔍 ابحث برقم الصنف أو الاسم" value="'+esc(man.q)+'" autocomplete="off"><div id="mRes"></div>'+
+ '<p class="err" id="mErr" hidden></p>'+
+ '<div class="mact"><button class="btn acc lg" id="mSave" type="button">💾 حفظ الفاتورة وخصم المخزون</button></div><div class="acts"><div class="two-b"><button class="btn ghost" data-close="1" type="button">إغلاق مؤقت</button><button class="btn ghost" id="mClear" type="button">مسح الفاتورة</button></div><small class="note sm">«إغلاق مؤقت» يحتفظ بالفاتورة كمسودة ما دامت الصفحة مفتوحة.</small></div>';
+ sheet('manS','فاتورة يدوية',h);manDraw();
+}
+function manDraw(){manDrawLines();manDrawRes()}
+function manDrawLines(){var el=document.getElementById('mLines');if(!el)return;var L=manLines(),T=totals(L);
+ if(!L.length){el.innerHTML='<p class="empty sm">لم تُضف أصناف بعد. ابحث عن الصنف بالأسفل واضغط «+ كرتونة».</p>';return}
+ el.innerHTML='<ul class="clist">'+L.map(function(l,i){var p=l.p,left=p.stock-l.q;
+  return '<li><span class="cth">'+(p.images&&p.images[0]?'<img src="'+p.images[0]+'" alt="">':'')+'</span><div class="cmid"><b class="num">'+(i+1)+') '+esc(p.code)+'</b>'+(p.name?'<small>'+esc(p.name)+'</small>':'')+'<small>مقاس <span class="num">'+esc(p.sizes)+'</span> · '+p.pack+' قطعة × '+money(p.price)+' د.ل</small>'+
+  '<div class="qty sm"><button data-mdec="'+p.id+'" type="button" aria-label="أقل">−</button><input class="mqn num" data-mq="'+p.id+'" type="number" inputmode="numeric" min="1" max="'+p.stock+'" value="'+l.q+'" aria-label="عدد الكراتين"><small>كرتونة</small><button data-minc="'+p.id+'" type="button" aria-label="أكثر"'+(left<=0?' disabled':'')+'>+</button></div><small class="'+(left<=0?'lim':'mleft')+'">'+(left<=0?'هذا كل المتوفر':'يبقى في المخزن: '+cartons(left))+'</small></div>'+
+  '<div class="cend"><b class="num">'+money(l.tot)+'</b><small>د.ل</small><button class="rm" data-mrm="'+p.id+'" type="button">حذف</button></div></li>'}).join('')+'</ul>'+
+ '<div class="sum"><div><span>عدد الأصناف</span><b>'+L.length+'</b></div><div><span>الكراتين</span><b>'+T.c+'</b></div><div><span>القطع</span><b>'+T.p+'</b></div><div class="big"><span>الإجمالي</span><b><span class="num">'+money(T.t)+'</span> د.ل</b></div></div>';
+}
+function manDrawRes(){var el=document.getElementById('mRes');if(!el)return;var q=nrm(man.q);
+ var R=D.products.filter(function(p){return p.stock>0&&(!q||nrm(p.code).indexOf(q)>=0||nrm(p.name).indexOf(q)>=0)});
+ var n=R.length;R=R.slice(0,q?40:20);
+ if(!n){el.innerHTML='<p class="empty sm">'+(q?'لا يوجد صنف متوفر بهذا الرقم أو الاسم.':'لا توجد أصناف متوفرة في المخزون.')+'</p>';return}
+ el.innerHTML=(!q?'<p class="note sm">اكتب جزءاً من رقم الصنف للبحث. أول '+R.length+' من '+n+' صنف متوفر:</p>':n>R.length?'<p class="note sm">أول '+R.length+' من '+n+' نتيجة — اكتب الرقم كاملاً لتضييق البحث.</p>':'')+
+ '<ul class="mres">'+R.map(function(p){var inv=man.L[p.id]||0,left=p.stock-inv;
+  return '<li><span class="cth">'+(p.images&&p.images[0]?'<img src="'+p.images[0]+'" alt="" loading="lazy">':'')+'</span><div class="cmid"><b class="num">'+esc(p.code)+'</b>'+(p.name?'<small>'+esc(p.name)+'</small>':'')+'<small>مقاس <span class="num">'+esc(p.sizes)+'</span> · المتوفر '+cartons(left)+(p.hidden?' · 🚫 مخفي عن الزبائن':'')+'</small>'+(inv?'<small class="minv">في الفاتورة: '+cartons(inv)+'</small>':'')+'</div>'+
+  '<button class="btn acc madd" data-minc="'+p.id+'" type="button"'+(left<=0?' disabled':'')+'>+ كرتونة</button></li>'}).join('')+'</ul>';
+}
+function manSet(id,q){var p=find(id);if(!p)return;q=Math.max(0,Math.min(p.stock,Math.round(q)||0));
+ if(q>0){if(!man.L[id])man.ord.push(id);man.L[id]=q}else{delete man.L[id];man.ord=man.ord.filter(function(x){return x!==id})}}
+function manSync(){['name','city','tel','note'].forEach(function(k){var el=document.getElementById('m'+k[0].toUpperCase()+k.slice(1));if(el)man[k]=el.value.trim()})}
+function manErr(t,focus){var er=document.getElementById('mErr');if(er){er.textContent=t;er.hidden=false;er.scrollIntoView({block:'center'})}if(focus){var f=document.getElementById(focus);if(f)f.focus()}}
+function manSave(){manSync();
+ if(!man.name){manErr('اكتب اسم الفرع أو الزبون.','mName');return}
+ var L0=manLines();if(!L0.length){manErr('أضف صنفاً واحداً على الأقل.','mQ');return}
+ if(man.tel&&waOf(man.tel).length<9){manErr('رقم الواتساب غير صحيح. صحّحه أو اتركه فارغاً.','mTel');return}
+ if(!live){manErr('لا يوجد اتصال بالمخزون الآن. تأكد من الإنترنت ثم حاول مرة أخرى.');return}
+ if(busy)return;busy=true;var b=document.getElementById('mSave');b.disabled=true;b.textContent='جارٍ الحفظ وخصم المخزون…';
+ var L=flat(L0),T=totals(L0),F=fb.fs,ref=F.doc(F.collection(db,'orders')),cu={name:man.name,city:man.city,tel:man.tel,note:man.note};
+ F.runTransaction(db,function(tx){
+  var refs=L.map(function(l){return F.doc(db,'products',l.id)});
+  return Promise.all(refs.map(function(r){return tx.get(r)})).then(function(snaps){
+   var short=[];snaps.forEach(function(s,i){var st=s.exists()?(s.data().stock||0):0;if(st<L[i].q)short.push(L[i].code+' (المتوفر '+st+')')});
+   if(short.length){var e=new Error('short');e.short=short;throw e}
+   snaps.forEach(function(s,i){tx.update(refs[i],{stock:s.data().stock-L[i].q})});
+   tx.set(ref,{no:invNo(),date:today(),status:'accepted',manual:true,createdAt:F.serverTimestamp(),doneAt:F.serverTimestamp(),customer:cu,lines:L,totals:T});
+  })}).then(function(){
+  busy=false;manKeepBr(cu.name);man=null;closeSheets();adminTab='orders';ordTab='accepted';render();scrollTo(0,0);
+  toast('✅ تم حفظ فاتورة '+cu.name+' وخصم '+cartons(T.c)+' من المخزون',4500);
+ },function(e){busy=false;b.disabled=false;b.textContent='💾 حفظ الفاتورة وخصم المخزون';
+  if(e&&e.short){manErr('الكمية في المخزن أقل من المطلوب: '+e.short.join('، ')+'. عدّل الكمية ثم احفظ مرة أخرى.');return}
+  console.error(e);manErr(e&&e.code==='permission-denied'?permMsg(e):'تعذّر الحفظ. تأكد من الإنترنت ثم حاول مرة أخرى.')});
+}
+function cancelManual(id){var o=orders.filter(function(x){return x.id===id})[0];if(!o||!o.manual)return;var F=fb.fs;
+ F.runTransaction(db,function(tx){
+  var L=o.lines||[],refs=L.map(function(l){return F.doc(db,'products',l.id||'x')}),oref=F.doc(db,'orders',id);
+  return Promise.all([tx.get(oref)].concat(refs.map(function(r){return tx.get(r)}))).then(function(s){
+   if(!s[0].exists()||s[0].data().status==='rejected')return;
+   s.slice(1).forEach(function(ps,i){if(ps.exists())tx.update(refs[i],{stock:(ps.data().stock||0)+(L[i].q||0)})});
+   tx.update(oref,{status:'rejected',doneAt:F.serverTimestamp()});
+  })}).then(function(){toast('تم إلغاء الفاتورة وإرجاع الكمية للمخزون ↩️',4000)},function(e){console.error(e);toast(permMsg(e))});
+}
+
 /* ---------- zoom ---------- */
 function openZoom(p){if(!p||!p.images||!p.images.length)return;zoomList=p.images;zoomI=0;zoomTitle=p.code;drawZoom();
  if(p.th&&!p._full)getFull(p).then(function(L){if(L&&L.length&&document.getElementById('zoom')&&zoomTitle===p.code){zoomList=L;if(zoomI>=L.length)zoomI=0;drawZoom()}})}
@@ -503,6 +575,7 @@ function renderAdmin(){
   h+=catTabs(pvCat,'pvcat',pc)+(pc.none?'<p class="note">⚠️ '+pc.none+' صنف بدون قسم لا يراه الزبائن. حدّد قسمه من تبويب «البضاعة والمخزون».</p>':'');
   h+='<div class="grid pv">'+(shown.length?shown.map(shopCard).join(''):'<p class="empty">لا توجد أصناف ظاهرة للزبائن.</p>')+'</div>';
  }else if(adminTab==='orders'){
+  h+='<button class="btn acc manbtn" id="openMan" type="button">🏬 فاتورة يدوية — توزيع على فرع'+(man&&man.ord.length?' <small>(مسودة: '+man.ord.length+' صنف)</small>':'')+'</button>';
   h+='<div class="storeset"><label>رقم واتساب المخزن<input id="storeNum" type="tel" dir="ltr" inputmode="tel" placeholder="09xxxxxxxx" value="'+esc(storeNum())+'"></label><small>يُحفظ على هذا الجهاز. إذا تركته فارغاً، يسألك الواتساب لمن ترسل (شخص أو مجموعة).</small></div>';
   if(ordersErr)h+='<p class="err">'+esc(ordersErr)+'</p>';
   else if(!orders.length)h+='<p class="empty">لا توجد طلبات بعد. أي طلب يرسله زبون يظهر هنا فوراً.</p>';
@@ -534,7 +607,7 @@ function renderAdmin(){
 }
 function orderCard(o){
  var c=o.customer||{},T=o.totals||{};
- return '<article class="ocard'+(o.status==='new'?' isnew':'')+'"><div class="ohd"><div><b class="num">'+esc(o.no||'')+'</b> '+stLabel(o.status)+'</div><small class="num">'+fmtTime(o.createdAt)+'</small></div>'+
+ return '<article class="ocard'+(o.status==='new'?' isnew':'')+'"><div class="ohd"><div><b class="num">'+esc(o.no||'')+'</b> '+stLabel(o.status)+(o.manual?' <span class="st man">🏬 يدوية</span>':'')+'</div><small class="num">'+fmtTime(o.createdAt)+'</small></div>'+
  '<div class="pcust"><div><span>الزبون</span><b>'+esc(c.name||'—')+'</b></div><div><span>المدينة</span><b>'+esc(c.city||'—')+'</b></div><div><span>الهاتف</span><b class="num">'+esc(c.tel||'—')+'</b></div>'+(c.note?'<div class="wide"><span>ملاحظات</span><b>'+esc(c.note)+'</b></div>':'')+'</div>'+
  invTable(o.lines||[])+
  '<div class="grandl"><span>المبلغ</span><b><span class="num">'+money(T.t)+'</span> د.ل · '+(T.c||0)+' كرتونة</b></div>'+
@@ -543,7 +616,8 @@ function orderCard(o){
  (o.status!=='rejected'?'<button class="btn invimg pdfbtn" data-storepdf="'+o.id+'" type="button">'+(pdfReady[o.id]?'✅ ملف PDF جاهز — اضغط لفتحه أو طباعته':'🖨️ فاتورة المخزن PDF للطباعة (A4)')+'</button>':'')+
  (o.status!=='rejected'?'<a class="wa store" href="'+storeLink(o)+'" target="_blank" rel="noopener" data-store="'+o.id+'">📦 إرسال للمخزن للتجهيز'+(o.sentToStore?' (أُرسل ✓)':'')+'</a>':'')+
  (o.status==='new'?'<div class="two-b"><button class="btn acc" data-accept="'+o.id+'" type="button">قبول وإرسال رد للزبون</button><button class="btn ghost" data-reject="'+o.id+'" type="button">رفض وإرجاع الكمية</button></div>':
-  '<div class="two-b"><a class="wa2" href="'+waLink(o,o.status==='accepted')+'" target="_blank" rel="noopener">مراسلة الزبون على الواتساب</a></div>')+
+  ((o.customer||{}).tel?'<div class="two-b"><a class="wa2" href="'+waLink(o,o.status==='accepted')+'" target="_blank" rel="noopener">مراسلة الزبون على الواتساب</a></div>':''))+
+ (o.manual&&o.status!=='rejected'?'<button class="btn cancelm" data-mcancel="'+o.id+'" type="button">↩️ إلغاء الفاتورة وإرجاع الكمية للمخزون</button>':'')+
  '<button class="delo" data-delo="'+o.id+'" type="button">🗑️ حذف الفاتورة</button>'+
  '</article>';
 }
@@ -833,6 +907,9 @@ document.addEventListener('click',function(e){
   if(!ds.sure){ds.sure='1';t.textContent='متأكد؟ اضغط مرة ثانية للحذف النهائي'+(DO.status==='new'?' (ستُرجع الكمية للمخزون)':'');return}
   delOrders([DO],t);return}
  if(ds.accept){acceptOrder(ds.accept);return}
+ if(ds.mcancel){if(ds.sure)cancelManual(ds.mcancel);else{ds.sure='1';t.textContent='متأكد؟ اضغط مرة ثانية لإلغاء الفاتورة وإرجاع الكمية'}return}
+ if(ds.mbr!=null){var mn=document.getElementById('mName'),mc=document.getElementById('mCity');if(mn){var BC={'الرجالي بنغازي':'بنغازي','المعرض':''},cv=BC.hasOwnProperty(ds.mbr)?BC[ds.mbr]:ds.mbr;if(mc&&(!mc.value||mc.value===mn.value||mc.dataset.auto==='1')){mc.value=cv;mc.dataset.auto='1'}mn.value=ds.mbr;manSync();document.querySelectorAll('[data-mbr]').forEach(function(c){c.classList.toggle('on',c.dataset.mbr===ds.mbr)})}return}
+ if(ds.minc||ds.mdec||ds.mrm){manSync();var mi=ds.minc||ds.mdec||ds.mrm;manSet(mi,ds.mrm?0:(man.L[mi]||0)+(ds.minc?1:-1));if(ds.minc&&!ds.mrm&&t.classList.contains('madd')){var mp2=find(mi);if(mp2)toast('أُضيف '+mp2.code+' — '+cartons(man.L[mi]||0))}manDraw();return}
  if(ds.reject){if(ds.sure)rejectOrder(ds.reject);else{ds.sure='1';t.textContent='اضغط مرة ثانية لتأكيد الرفض'}return}
  if(ds.readai){readCard(find(ds.readai));return}
  if(ds.savep){var sp=find(ds.savep);sp._dirty=false;saveProduct(sp);return}
@@ -844,6 +921,9 @@ document.addEventListener('click',function(e){
   case 'openCart':case 'openCart2':case 'backCart':openCart();return;
   case 'clearCart':if(ds.sure){cart={};curInv=null;saveCart();closeSheets();render()}else{ds.sure='1';t.textContent='اضغط مرة ثانية للتأكيد'}return;
   case 'toInv':openInvoice();return;
+  case 'openMan':openManual();return;
+  case 'mSave':manSave();return;
+  case 'mClear':if(ds.sure){manNew();closeSheets();render();openManual()}else{ds.sure='1';t.textContent='اضغط مرة ثانية للمسح'}return;
   case 'sendOrder':sendOrder();return;
   case 'saveInv':if(lastOrder)saveImg(lastOrder.no);return;
   case 'zClose':closeZoom();return;
@@ -876,8 +956,11 @@ document.addEventListener('input',function(e){var t=e.target;
  if(t.dataset.f){var p=find(t.dataset.id),f=t.dataset.f;p[f]=(f==='code'||f==='sizes'||f==='name'||f==='cat')?t.value.trim():Math.max(0,Number(t.value)||0);p._dirty=true;var b=document.querySelector('[data-savep="'+p.id+'"]');if(b)b.disabled=false;var c=t.closest('.card');if(c)c.classList.add('dirty');if(f==='cat')t.classList.toggle('miss',!t.value);return}
  if(t.id==='storeNum'){try{localStorage.setItem('wf_store',t.value.trim())}catch(er){}document.querySelectorAll('a[data-store]').forEach(function(a){var o=orders.filter(function(x){return x.id===a.dataset.store})[0];if(o)a.href=storeLink(o)});return}
  if(t.id==='cName'||t.id==='cCity'||t.id==='cNote'||t.id==='cTel')syncCust();
+ if(t.id==='mQ'&&man){man.q=t.value;manDrawRes();return}
+ if(t.id==='mCity')t.dataset.auto='';
+ if(man&&(t.id==='mName'||t.id==='mCity'||t.id==='mNote'||t.id==='mTel'))manSync();
 });
-document.addEventListener('change',function(e){var t=e.target;if(t.id==='aiIn'){var af=[].slice.call(t.files||[]);t.value='';if(!af.length)return;if(!fbApp){toast('انتظر حتى يتصل النظام بالإنترنت ثم حاول مرة أخرى',4500);return}photoBatch(af);return}if(t.id==='xlsIn'){var xf=t.files&&t.files[0];t.value='';if(xf)xlRead(xf);return}if(t.id!=='cardIn'||!pickId)return;var p=find(pickId),fs=[].slice.call(t.files||[]);t.value='';if(!p||!fs.length||notReady(p))return;toast('جارٍ تجهيز الصور…');
+document.addEventListener('change',function(e){var t=e.target;if(t.dataset&&t.dataset.mq&&man){manSet(t.dataset.mq,Number(digits(t.value))||0);manDraw();return}if(t.id==='aiIn'){var af=[].slice.call(t.files||[]);t.value='';if(!af.length)return;if(!fbApp){toast('انتظر حتى يتصل النظام بالإنترنت ثم حاول مرة أخرى',4500);return}photoBatch(af);return}if(t.id==='xlsIn'){var xf=t.files&&t.files[0];t.value='';if(xf)xlRead(xf);return}if(t.id!=='cardIn'||!pickId)return;var p=find(pickId),fs=[].slice.call(t.files||[]);t.value='';if(!p||!fs.length||notReady(p))return;toast('جارٍ تجهيز الصور…');
  Promise.all(fs.map(shrink)).then(function(a){var first=!(p.images&&p.images.length);p.images=(p.images||[]).concat(a);p._dirty=true;render();if(first&&(!p.code||p.code==='صنف جديد'||!p.sizes))readCard(p)},function(){toast('تعذّرت قراءة إحدى الصور')})});
 window.addEventListener('hashchange',function(){storeMode=parseStore();if(storeMode){watchPrep();render();return}var a=/^#admin/i.test(location.hash);if(a!==isAdminUrl){isAdminUrl=a;closeSheets();subProducts();if(a&&user){watchOrders();watchPrepAll()}else if(!a&&unsubOrders){unsubOrders();unsubOrders=null;seenNew=null}render()}});
 
@@ -902,7 +985,25 @@ Promise.all([import(G+'firebase-app.js'),import(G+'firebase-firestore.js'),impor
 <ol class="it-steps"></ol>
 </div>
 <style>
-.pv .add,.pv .qty{display:none}.scanbox a.scan{text-decoration:none}
+.pv .add,.pv .qty{display:none}
+.manbtn{display:block;width:100%;margin:0 0 14px;font-size:1.05rem;padding:14px}
+.mh{font-size:1rem;margin:16px 0 6px}
+.msearch{width:100%;border:1.5px solid var(--line);border-radius:12px;background:var(--surface);padding:10px 12px;font-size:1rem;color:var(--ink)}
+.mres{list-style:none;margin:8px 0 0;padding:0}
+.mres li{display:grid;grid-template-columns:54px 1fr auto;gap:10px;align-items:center;padding:8px 0;border-bottom:1px solid var(--line)}
+.mres .cth{width:54px;height:60px}
+.mres .cmid small,.clist .cmid small{display:block}
+.mres .minv{color:var(--ok);font-weight:700}
+.madd{white-space:nowrap;padding:9px 12px}
+.mqn{width:62px;height:34px;border:1.5px solid var(--line);border-radius:10px;text-align:center;font-weight:900;font-size:1rem;background:var(--bg);color:var(--ink)}
+.mleft{color:var(--muted)}
+.mbr{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin:0 0 6px;font-size:.85rem;color:var(--muted)}
+.chip{border:1.5px solid var(--line);background:var(--bg);color:var(--ink);border-radius:999px;padding:8px 16px;font-weight:700;font-size:.95rem}.chip.on{background:var(--accent);border-color:var(--accent);color:#fff}
+.empty.sm,.note.sm{font-size:.85rem;margin:6px 0}
+.mact{position:sticky;bottom:-18px;background:var(--surface);padding:10px 0;margin-top:10px;z-index:2}.mact .btn{width:100%}
+.st.man{background:#e8eefb;color:#23408e}
+.cancelm{border:1.5px solid #b3261e;color:#b3261e;background:transparent}
+.scanbox a.scan{text-decoration:none}
 .chk{margin:0 0 8px;padding:8px 10px;border-radius:10px;font-size:13.5px;line-height:1.6}
 .chk.ok{background:#e7f5ee;color:#1f7a4d}.chk.bad{background:#fdecea;color:#b3261e}.chk.none{background:#fff4e0;color:#8a4b00}
 .chk .rc{display:inline-block;white-space:nowrap;font-weight:700}.chk .btn{display:block;margin-top:6px;font-size:13px;padding:6px 10px}
