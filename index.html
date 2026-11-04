@@ -239,6 +239,9 @@ label.f input,label.f textarea{border:1.5px solid var(--line);border-radius:10px
 .ctab{flex:1 0 auto;min-width:76px;border:1.5px solid var(--line);background:var(--surface);color:var(--ink);border-radius:99px;padding:8px 14px;font-weight:700;white-space:nowrap}
 .ctab.on{background:var(--accent);color:var(--accent-ink);border-color:transparent}
 .ctab small{opacity:.75;font-weight:600}
+.ctabs.main .ctab{flex:1 1 0;min-width:0;padding:8px 4px;font-size:.95rem}.ctabs.sub .ctab{flex:1 1 0;min-width:0}
+.ctabs.sub{margin-top:-8px}.ctabs.sub .ctab{padding:6px 12px;font-size:.92rem;border-style:dashed}.ctabs.sub .ctab.on{border-style:solid}
+.cpick button:nth-child(5):last-child{grid-column:1/-1}
 .cpick{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin:6px 0 10px}
 .cpick button{border:0;border-radius:18px;background:var(--surface);border:1.5px solid var(--line);padding:26px 10px;font-family:var(--f-display);font-size:1.45rem;font-weight:700;color:var(--ink);display:flex;flex-direction:column;align-items:center;gap:6px}
 .cpick button span{font-size:2.2rem;line-height:1}
@@ -279,12 +282,16 @@ var WA_NOTIFY={phone:'218915101605',key:''};
 var ordTab='new';var isAdminUrl=/^#admin/i.test(location.hash),adminTab='orders',orders=[],ordersErr='',unsubOrders=null,seenNew=null,busy=false;
 var zoomList=[],zoomI=0,zoomTitle='';
 var CATS=[['men','رجالي','👞'],['women','نسائي','👠'],['boys','أولاد','👟'],['girls','بنات','🎀']];
-function catName(k){for(var i=0;i<CATS.length;i++)if(CATS[i][0]===k)return CATS[i][1];return ''}
-function catKey(v){var t=String(v||'').trim().toLowerCase().replace(/[أإآ]/g,'ا').replace(/ة/g,'ه').replace(/ى/g,'ي').replace(/\s/g,'');if(!t)return '';
+var PCATS=[['pmen','بلاستيك رجالي','👞','رجالي'],['pwomen','بلاستيك نسائي','👠','نسائي'],['pboys','بلاستيك أولاد','👟','أولاد'],['pgirls','بلاستيك بنات','🎀','بنات']];
+var ALLCATS=CATS.concat(PCATS);
+function isPl(k){return k==='plastic'||/^p(men|women|boys|girls)$/.test(k||'')}
+function catName(k){for(var i=0;i<ALLCATS.length;i++)if(ALLCATS[i][0]===k)return ALLCATS[i][1];return ''}
+function catKey(v){var t=String(v||'').trim().toLowerCase().replace(/[أإآ]/g,'ا').replace(/ة/g,'ه').replace(/ى/g,'ي').replace(/[\s\-–_\/]/g,'');if(!t)return '';
+ var pm=t.match(/^(بلاستيك|بلاستك|بلاستيكي|plastic)(.+)$/)||t.match(/^(.+?)(بلاستيك|بلاستك|بلاستيكي|plastic)$/);if(pm){var sub=catKey(pm[1].indexOf('بلاست')===0||pm[1]==='plastic'?pm[2]:pm[1]);return CATS.some(function(c){return c[0]===sub})?'p'+sub:''}
  if(/^(men|man|male|رجالي|رجال|رجل|رجالى)$/.test(t))return 'men';if(/^(women|woman|ladies|lady|نسائي|نساء|نسواني|حريمي|حريم|ستاتي)$/.test(t))return 'women';
  if(/^(boys|boy|kidsboys|اولاد|ولادي|ولد|صبياني|اطفالاولاد)$/.test(t))return 'boys';if(/^(girls|girl|بنات|بناتي|بنت|اطفالبنات)$/.test(t))return 'girls';
- for(var i=0;i<CATS.length;i++)if(CATS[i][0]===t)return t;return ''}
-var custCat='';try{custCat=localStorage.getItem('wf_cat')||''}catch(e){}if(!catName(custCat))custCat='';
+ for(var i=0;i<ALLCATS.length;i++)if(ALLCATS[i][0]===t)return t;return ''}
+var custCat='';try{custCat=localStorage.getItem('wf_cat')||''}catch(e){}if(!catName(custCat)&&custCat!=='plastic')custCat='';
 var KNOWN={},unsubProd=null,prodMode='',catLive=false,admCat='auto',pvCat='all';
 
 function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]})}
@@ -320,9 +327,13 @@ function render(){
  h+='</header>';
  if(dbErr)h+='<p class="note live">⚠️ تعذّر الاتصال بالمخزون المباشر. تأكد من الإنترنت ثم حدّث الصفحة.</p>';
  if(!custCat){
-  h+='<h2 class="brand" style="font-size:1.3rem;text-align:center;margin:8px 0 4px">اختر القسم</h2><div class="cpick">'+CATS.map(function(c){return '<button type="button" data-cat="'+c[0]+'"><span>'+c[2]+'</span>'+c[1]+'</button>'}).join('')+'</div>';
+  h+='<h2 class="brand" style="font-size:1.3rem;text-align:center;margin:8px 0 4px">اختر القسم</h2><div class="cpick">'+CATS.concat([['plastic','بلاستيك','🩴']]).map(function(c){return '<button type="button" data-cat="'+c[0]+'"><span>'+c[2]+'</span>'+c[1]+'</button>'}).join('')+'</div>';
  }else{
-  h+=catTabs(custCat,'cat');
+  h+=custTabs(custCat);
+ }
+ if(custCat==='plastic'){
+  h+='<h2 class="brand" style="font-size:1.2rem;text-align:center;margin:4px 0">قسم البلاستيك — اختر</h2><div class="cpick">'+PCATS.map(function(c){return '<button type="button" data-cat="'+c[0]+'"><span>'+c[2]+'</span>'+c[3]+'</button>'}).join('')+'</div>';
+ }else if(custCat){
   if(!catLive&&!dbErr)h+='<p class="note live">جارٍ تحميل أصناف قسم '+catName(custCat)+'…</p>';
   h+='<div class="grid">';
   var shown=D.products.filter(function(p){return p.stock>0&&p.price>0&&!p.hidden&&!p.pend&&p.cat===custCat});
@@ -336,7 +347,11 @@ function render(){
   h+='<div class="bar"><div class="in"><div><b>'+cartons(n)+' · <span class="num">'+money(tot)+'</span> دينار</b><small>'+pcs+' زوجاً</small></div><button class="btn acc" id="openCart2">عرض السلة</button></div></div>'}
  app.innerHTML=h;
 }
-function catTabs(cur,attr,counts){return '<div class="ctabs" role="tablist">'+(counts?(counts.pend?[['pend','📥 الدفعة الجديدة']]:[]).concat([['all','الكل']]).concat(CATS).concat(counts.none?[['none','بدون قسم']]:[]).concat(counts.hidden?[['hidden','🚫 المخفية']]:[]):CATS).map(function(c){return '<button class="ctab'+(cur===c[0]?' on':'')+'" data-'+attr+'="'+c[0]+'" type="button" role="tab" aria-selected="'+(cur===c[0])+'">'+c[1]+(counts?' <small class="num">'+(counts[c[0]]||0)+'</small>':'')+'</button>'}).join('')+'</div>'}
+function custTabs(cur){var pl=isPl(cur),main=pl?'plastic':cur;
+ var h='<div class="ctabs main" role="tablist">'+CATS.concat([['plastic','بلاستيك']]).map(function(c){return '<button class="ctab'+(main===c[0]?' on':'')+'" data-cat="'+c[0]+'" type="button" role="tab" aria-selected="'+(main===c[0])+'">'+c[1]+'</button>'}).join('')+'</div>';
+ if(pl&&cur!=='plastic')h+='<div class="ctabs sub" role="tablist">'+PCATS.map(function(c){return '<button class="ctab'+(cur===c[0]?' on':'')+'" data-cat="'+c[0]+'" type="button" role="tab" aria-selected="'+(cur===c[0])+'">'+c[3]+'</button>'}).join('')+'</div>';
+ return h}
+function catTabs(cur,attr,counts){return '<div class="ctabs" role="tablist">'+(counts?(counts.pend?[['pend','📥 الدفعة الجديدة']]:[]).concat([['all','الكل']]).concat(ALLCATS).concat(counts.none?[['none','بدون قسم']]:[]).concat(counts.hidden?[['hidden','🚫 المخفية']]:[]):CATS).map(function(c){return '<button class="ctab'+(cur===c[0]?' on':'')+'" data-'+attr+'="'+c[0]+'" type="button" role="tab" aria-selected="'+(cur===c[0])+'">'+c[1]+(counts?' <small class="num">'+(counts[c[0]]||0)+'</small>':'')+'</button>'}).join('')+'</div>'}
 function catCounts(L){var r={all:0,none:0,hidden:0,pend:0};L.forEach(function(p){if(p.pend){r.pend++;return}r.all++;if(catName(p.cat))r[p.cat]=(r[p.cat]||0)+1;else r.none++;if(p.hidden)r.hidden++});return r}
 function inCat(p,c){if(c==='pend')return !!p.pend;if(p.pend)return false;return c==='all'||(c==='hidden'?!!p.hidden:c==='none'?!catName(p.cat):p.cat===c)}
 function shopCard(p){
@@ -508,7 +523,7 @@ function manDrawLines(){var el=document.getElementById('mLines');if(!el)return;v
 function manDrawRes(){var el=document.getElementById('mRes');if(!el)return;var q=nrm(man.q),mc=man.cat||'all';
  var A=D.products.filter(function(p){return p.stock>0&&(!q||nrm(p.code).indexOf(q)>=0||nrm(p.name).indexOf(q)>=0)});
  var cn={all:A.length};A.forEach(function(p){if(catName(p.cat))cn[p.cat]=(cn[p.cat]||0)+1;else cn.none=(cn.none||0)+1});
- var tabs='<div class="mcats">'+[['all','الكل']].concat(CATS).concat(cn.none?[['none','بدون قسم']]:[]).map(function(c){return '<button class="chip'+(mc===c[0]?' on':'')+'" data-mcat="'+c[0]+'" type="button">'+c[1]+' <small class="num">'+(cn[c[0]]||0)+'</small></button>'}).join('')+'</div>';
+ var tabs='<div class="mcats">'+[['all','الكل']].concat(ALLCATS).concat(cn.none?[['none','بدون قسم']]:[]).map(function(c){return '<button class="chip'+(mc===c[0]?' on':'')+'" data-mcat="'+c[0]+'" type="button">'+c[1]+' <small class="num">'+(cn[c[0]]||0)+'</small></button>'}).join('')+'</div>';
  var R=A.filter(function(p){return mc==='all'||(mc==='none'?!catName(p.cat):p.cat===mc)});
  var z=D.products.filter(function(p){return p.stock<=0}).length;
  if(!R.length){el.innerHTML=tabs+'<p class="empty sm">'+(q?'لا يوجد صنف متوفر بهذا الرقم أو الاسم.':'لا توجد أصناف متوفرة هنا.')+'</p>';return}
@@ -655,13 +670,13 @@ function renderAdmin(){
   if(D.fromDb)h+='<div class="scanbox"><div><b>📷 أصناف من الصور</b><span>اختر صورة أو عدة صور. إذا كان اسم ملف الصورة هو رقم الصنف (مثل DT-261084.jpg أو DT-261084 (2).jpg) تُضاف للصنف مباشرة. وإلا يقرأ النظام رقم الصنف من الصورة نفسها، فإن وجده أضافها له، وإلا أنشأ صنفاً جديداً. نصيحة: اختر القسم من الأعلى أولاً، فتدخل الأصناف الجديدة في هذا القسم مباشرة.</span></div><label class="scan'+(aiBusy?' busy':'')+'" for="aiIn">'+(aiBusy?'جارٍ قراءة الصور وحفظها… باقي '+aiBusy+' — أبقِ الصفحة مفتوحة':'اختر الصور')+'</label></div>';
   if(D.fromDb){var cs=chkSum();h+='<div class="scanbox chkbox"><div><b>🔍 مطابقة الصور مع أرقام الأصناف</b><span>يقرأ النظام الرقم المكتوب على الصورة الرئيسية لكل صنف ويقارنه برقم الصنف المسجّل. '+(cs.t?'النتيجة: ✅ مطابق '+cs.ok+' — ⚠️ غير مطابق '+cs.bad+' — ❔ لم يُقرأ '+cs.none:'')+'</span></div><div class="xbtns"><button class="scan'+(chkBusy?' busy':'')+'" id="chkAll" type="button"'+(chkBusy||aiBusy?' disabled':'')+'>'+(chkBusy?'جارٍ الفحص… باقي '+chkBusy:'افحص كل الأصناف')+'</button>'+(cs.bad+cs.none?'<button class="btn ghost" id="chkOnly" type="button">'+(chkOnly?'عرض كل الأصناف':'عرض غير المطابق فقط ('+(cs.bad+cs.none)+')')+'</button>':'')+'</div></div>'}
   var nd=D.products.filter(function(p){return p._dirty}).length;if(nd)h+='<div class="savebar"><span>'+nd+' صنف فيه تعديلات غير محفوظة</span><button class="btn acc" id="saveAll" type="button">حفظ الكل</button></div>';
-  if(D.fromDb)h+='<div class="scanbox"><div><b>استيراد الأصناف من إكسل</b><span>رقم الصنف، الاسم، المقاسات، العبوة، السعر، الكمية، والقسم (رجالي / نسائي / أولاد / بنات). الأصناف الموجودة تتحدّث، والجديدة تُضاف. الصور تضيفها باليد بعد ذلك.</span></div><div class="xbtns"><label class="scan" for="xlsIn">اختر ملف الإكسل</label><button class="btn ghost" id="xlsTpl" type="button">تنزيل النموذج</button></div></div>';
+  if(D.fromDb)h+='<div class="scanbox"><div><b>استيراد الأصناف من إكسل</b><span>رقم الصنف، الاسم، المقاسات، العبوة، السعر، الكمية، والقسم (رجالي / نسائي / أولاد / بنات، أو للبلاستيك: بلاستيك رجالي / بلاستيك نسائي / بلاستيك أولاد / بلاستيك بنات). الأصناف الموجودة تتحدّث، والجديدة تُضاف. الصور تضيفها باليد بعد ذلك.</span></div><div class="xbtns"><label class="scan" for="xlsIn">اختر ملف الإكسل</label><button class="btn ghost" id="xlsTpl" type="button">تنزيل النموذج</button></div></div>';
   var acn=catCounts(D.products);if(admCat==='auto'&&D.fromDb&&D.products.length)admCat=acn.pend?'pend':acn.none?'none':'all';if(admCat==='pend'&&!acn.pend)admCat=acn.none?'none':'all';if(admCat==='none'&&!acn.none)admCat='all';if(admCat==='hidden'&&!acn.hidden)admCat='all';
   if(acn.pend){var PL=D.products.filter(function(p){return p.pend}),pNo=PL.filter(function(p){return !(p.images&&p.images.length)}).length,pOr=PL.filter(function(p){return p.code==='صنف جديد'}).length;
    h+='<div class="pendbox"><div><b>📥 دفعة جديدة قيد المراجعة: <span class="num">'+acn.pend+'</span> صنف</b><span>هذه الأصناف منفصلة عن أصنافك السابقة ولا تظهر للزبائن حتى تعتمدها. راجعها واربط الصور، ثم اضغط «اعتماد». بعد الاعتماد تنضم للأصناف وتصنّف كل صنف في قسمه.</span>'+(pNo||pOr?'<span class="pw">'+(pNo?'⚠️ '+pNo+' صنف بدون صورة. ':'')+(pOr?'⚠️ '+pOr+' صورة غير مربوطة بصنف.':'')+'</span>':'<span class="pk">✅ كل الأصناف فيها صور</span>')+'</div><div class="xbtns">'+(admCat!=='pend'?'<button class="btn ghost" data-admcat="pend" type="button">عرض الدفعة</button>':'')+'<button class="scan" id="approve" type="button">✅ اعتماد الدفعة</button></div></div>'}
   h+='<div class="grid"><div class="catset" style="display:block"><b>📂 الأقسام</b>'+(acn.none?' <span style="color:var(--warn);font-weight:700;display:inline">— '+acn.none+' صنف بدون قسم لا يظهر للزبائن</span>':'')+catTabs(admCat,'admcat',acn).replace('margin:0 0 16px','')+'</div>';
   var AL=D.products.filter(function(p){return inCat(p,admCat)&&(!chkOnly||p._dirty||(chk[p.id]&&chk[p.id].s!=='ok'))});
-  if(AL.length&&D.fromDb)h+='<div class="catset"><span>نقل كل الأصناف المعروضة الآن ('+AL.length+' صنف) إلى قسم واحد دفعة واحدة:</span><select id="bulkCat"><option value="">— اختر القسم —</option>'+CATS.map(function(c){return '<option value="'+c[0]+'">'+c[1]+'</option>'}).join('')+'</select><button class="btn acc" id="bulkGo" type="button">تطبيق</button><span>أو إخفاء / إظهار كل هذه الأصناف للزبائن:</span><button class="btn ghost" id="bulkHide" type="button">🚫 إخفاء الكل</button><button class="btn ghost" id="bulkShow" type="button">👁️ إظهار الكل</button></div>';
+  if(AL.length&&D.fromDb)h+='<div class="catset"><span>نقل كل الأصناف المعروضة الآن ('+AL.length+' صنف) إلى قسم واحد دفعة واحدة:</span><select id="bulkCat"><option value="">— اختر القسم —</option>'+ALLCATS.map(function(c){return '<option value="'+c[0]+'">'+c[1]+'</option>'}).join('')+'</select><button class="btn acc" id="bulkGo" type="button">تطبيق</button><span>أو إخفاء / إظهار كل هذه الأصناف للزبائن:</span><button class="btn ghost" id="bulkHide" type="button">🚫 إخفاء الكل</button><button class="btn ghost" id="bulkShow" type="button">👁️ إظهار الكل</button></div>';
   h+=AL.map(editCard).join('')+'<button class="newcard" id="addProd" type="button">+ صنف جديد'+(catName(admCat)?' في قسم '+catName(admCat):'')+'</button></div>';
   h+='<p class="note">كل صنف يُحفظ بزر «حفظ» الخاص به، ويظهر التعديل للزبائن فوراً.</p>';
  }
@@ -729,7 +744,7 @@ function editCard(p){
   '<div class="chk none">❔ لم يُقرأ رقم واضح على الصورة — راجعها بعينك</div>';
  return '<article class="card'+(p.hidden?' hiddencard':'')+(p._dirty?' dirty':'')+(ck&&ck.s!=='ok'?' warncard':'')+'">'+bd+'<div class="ed"><div class="thumbs">'+th+'<label class="upl" title="إضافة صور" for="cardIn" data-pick="'+p.id+'">+</label></div>'+
  '<button class="hidebtn'+(p.hidden?' off':'')+'" data-hide="'+p.id+'" type="button">'+(p.hidden?'🚫 مخفي عن الزبائن — اضغط لإظهاره':'👁️ ظاهر للزبائن — اضغط لإخفائه')+'</button>'+
- '<label class="catl">📂 القسم<select data-f="cat" data-id="'+p.id+'"'+(catName(p.cat)?'':' class="miss"')+'><option value="">— اختر القسم —</option>'+CATS.map(function(c){return '<option value="'+c[0]+'"'+(p.cat===c[0]?' selected':'')+'>'+c[1]+'</option>'}).join('')+'</select></label>'+
+ '<label class="catl">📂 القسم<select data-f="cat" data-id="'+p.id+'"'+(catName(p.cat)?'':' class="miss"')+'><option value="">— اختر القسم —</option>'+ALLCATS.map(function(c){return '<option value="'+c[0]+'"'+(p.cat===c[0]?' selected':'')+'>'+c[1]+'</option>'}).join('')+'</select></label>'+
  (p.code==='صنف جديد'&&p.images&&p.images.length?linkSel(p):'')+'<label>رقم الصنف<input data-f="code" data-id="'+p.id+'" value="'+esc(p.code)+'"></label>'+
  '<label>اسم الصنف<input data-f="name" data-id="'+p.id+'" value="'+esc(p.name||'')+'"></label>'+
  '<label>المقاسات<input data-f="sizes" data-id="'+p.id+'" value="'+esc(p.sizes)+'"></label>'+
@@ -901,7 +916,7 @@ function xlRead(file){toast('جارٍ قراءة الملف…');
   xlPlan=plan;
   if(!plan.length){toast('لم أجد أصنافاً في الملف. تأكد أن أول عمود هو رقم الصنف.',4500);return}
   var nNew=plan.filter(function(x){return !x.ex}).length;
-  sheet('xlS','استيراد من إكسل','<div class="shd"><h2>مراجعة الاستيراد</h2><button class="x" data-close="1" type="button" aria-label="إغلاق">✕</button></div><p class="note">'+plan.length+' صنف: <b>'+nNew+' جديد</b> و<b>'+(plan.length-nNew)+' تحديث</b>'+(bad?' — تم تجاهل '+bad+' سطر بدون رقم صنف':'')+(badCat?' — ⚠️ '+badCat+' صنف القسم المكتوب له غير مفهوم (اكتب: رجالي، نسائي، أولاد، أو بنات)':'')+'</p>'+
+  sheet('xlS','استيراد من إكسل','<div class="shd"><h2>مراجعة الاستيراد</h2><button class="x" data-close="1" type="button" aria-label="إغلاق">✕</button></div><p class="note">'+plan.length+' صنف: <b>'+nNew+' جديد</b> و<b>'+(plan.length-nNew)+' تحديث</b>'+(bad?' — تم تجاهل '+bad+' سطر بدون رقم صنف':'')+(badCat?' — ⚠️ '+badCat+' صنف القسم المكتوب له غير مفهوم (اكتب: رجالي، نسائي، أولاد، بنات — أو: بلاستيك رجالي، بلاستيك نسائي، بلاستيك أولاد، بلاستيك بنات)':'')+'</p>'+
    '<div class="tblw"><table class="itab"><thead><tr><th>رقم الصنف</th><th>الاسم</th><th class="c">المقاسات</th><th class="c">العبوة</th><th class="c">السعر</th><th class="c">الكمية</th><th class="c">القسم</th><th class="c">الحالة</th></tr></thead><tbody>'+
    plan.map(function(x){var d=x.d;return '<tr><td class="num"><b>'+esc(d.code)+'</b></td><td>'+esc(d.name||'')+'</td><td class="c num">'+esc(d.sizes||'')+'</td><td class="c num">'+(d.pack!=null?d.pack:'')+'</td><td class="c num">'+(d.price!=null?d.price:'')+'</td><td class="c num">'+(d.stock!=null?d.stock:'')+'</td><td class="c">'+(d.cat?catName(d.cat):(x.ex?'':'<b style="color:var(--warn)">بدون</b>'))+'</td><td class="c">'+(x.ex?'تحديث':'<b style="color:var(--ok)">جديد</b>')+'</td></tr>'}).join('')+'</tbody></table></div>'+
    '<div class="acts"><button class="btn acc lg" id="xlGo" type="button">حفظ '+plan.length+' صنف</button><button class="btn ghost" data-close="1" type="button">إلغاء</button></div>');
@@ -922,7 +937,7 @@ function onProducts(s){
   if(!editing()&&!document.querySelector('.sheet'))render();
   else if(document.getElementById('cartS'))openCart();
 }
-function subProducts(){if(!fb||!db||storeMode)return;var F=fb.fs,want=isAdminUrl?'all':(custCat?'c:'+custCat:'');
+function subProducts(){if(!fb||!db||storeMode)return;var F=fb.fs,want=isAdminUrl?'all':(custCat&&custCat!=='plastic'?'c:'+custCat:'');
  if(want===prodMode)return;prodMode=want;if(unsubProd){unsubProd();unsubProd=null}
  D.products=D.products.filter(function(p){return p._dirty});catLive=false;
  if(!want){live=true;render();return}
@@ -932,7 +947,7 @@ function bulkHide(btn,h){var L=D.products.filter(function(p){return inCat(p,admC
  if(!btn.dataset.sure){btn.dataset.sure='1';btn.textContent='متأكد؟ '+(h?'إخفاء ':'إظهار ')+L.length+' صنف';return}
  btn.disabled=true;var F=fb.fs,jobs=[];for(var i=0;i<L.length;i+=400){var b=F.writeBatch(db);L.slice(i,i+400).forEach(function(p){b.set(F.doc(db,'products',p.id),{hidden:h},{merge:true});p.hidden=h});jobs.push(b.commit())}
  Promise.all(jobs).then(function(){render();toast((h?'🚫 تم إخفاء ':'👁️ تم إظهار ')+L.length+' صنف',4000)},function(e){console.error(e);btn.disabled=false;toast(permMsg(e),4500)})}
-function setCat(c){if(!catName(c))return;custCat=c;try{localStorage.setItem('wf_cat',c)}catch(e){}subProducts();render();scrollTo(0,0)}
+function setCat(c){if(!catName(c)&&c!=='plastic')return;custCat=c;try{localStorage.setItem('wf_cat',c)}catch(e){}subProducts();render();scrollTo(0,0)}
 function bulkCat(btn){var sel=document.getElementById('bulkCat'),c=sel&&sel.value;if(!catName(c)){toast('اختر القسم أولاً');return}
  var L=D.products.filter(function(p){return inCat(p,admCat)&&(!chkOnly||p._dirty||(chk[p.id]&&chk[p.id].s!=='ok'))});if(!L.length)return;
  if(btn.dataset.sure!==c){btn.dataset.sure=c;btn.textContent='متأكد؟ نقل '+L.length+' صنف إلى «'+catName(c)+'»';return}
