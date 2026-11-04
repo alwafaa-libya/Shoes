@@ -607,7 +607,7 @@ function manImpGo(){if(!man||!man.imp)return;var add=0,cut=0;man.imp.forEach(fun
 function openZoom(p){if(!p||!p.images||!p.images.length)return;zoomList=p.images;zoomI=0;zoomTitle=p.code;drawZoom();
  if(p.th&&!p._full)getFull(p).then(function(L){if(L&&L.length&&document.getElementById('zoom')&&zoomTitle===p.code){zoomList=L;if(zoomI>=L.length)zoomI=0;drawZoom()}})}
 function drawZoom(){var z=document.getElementById('zoom');if(!z){document.body.insertAdjacentHTML('beforeend','<div id="zoom" role="dialog" aria-label="الصورة مكبرة"><div class="zt"><span class="num" id="zT"></span><button id="zClose" type="button">إغلاق ✕</button></div><img id="zImg" alt=""><div class="zn" id="zN"><button id="zPrev" type="button" aria-label="السابقة">›</button><span id="zC" class="num"></span><button id="zNext" type="button" aria-label="التالية">‹</button></div></div>');z=document.getElementById('zoom')}
- document.getElementById('zImg').src=zoomList[zoomI];document.getElementById('zImg').alt='بوت '+zoomTitle;document.getElementById('zT').textContent=zoomTitle;
+ document.getElementById('zoom').classList.remove('big');document.getElementById('zImg').src=zoomList[zoomI];document.getElementById('zImg').alt='بوت '+zoomTitle;document.getElementById('zT').textContent=zoomTitle;
  document.getElementById('zN').hidden=zoomList.length<2;document.getElementById('zC').textContent=(zoomI+1)+' / '+zoomList.length}
 function closeZoom(){var z=document.getElementById('zoom');if(z)z.remove()}
 function step(d){zoomI=(zoomI+d+zoomList.length)%zoomList.length;drawZoom()}
@@ -720,7 +720,7 @@ function renderStore(){var S=storeMode,L=S.l,d=(prepDoc&&prepDoc.done)||[],k=L.f
  app.innerHTML=h}
 function storeLink(o){var n=waOf(storeNum());return (n.length>=9?'https://wa.me/'+n:'https://wa.me/')+'?text='+encodeURIComponent(storeText(o))}
 function editCard(p){
- var th=(p.images||[]).map(function(src,i){return '<div class="t'+(i===0?' main':'')+'"><img src="'+src+'" alt=""><button data-rmimg="'+p.id+'" data-i="'+i+'" type="button" aria-label="حذف الصورة">×</button>'+(i?'<button class="mk" data-mainimg="'+p.id+'" data-i="'+i+'" type="button" aria-label="اجعلها الرئيسية">★</button>':'')+'</div>'}).join('');
+ var th=(p.images||[]).map(function(src,i){return '<div class="t'+(i===0?' main':'')+'"><img src="'+src+'" alt="" data-zp="'+p.id+'" data-zi="'+i+'"><button data-rmimg="'+p.id+'" data-i="'+i+'" type="button" aria-label="حذف الصورة">×</button>'+(i?'<button class="mk" data-mainimg="'+p.id+'" data-i="'+i+'" type="button" aria-label="اجعلها الرئيسية">★</button>':'')+'</div>'}).join('');
  var ck=chk[p.id],bd='';
  if(ck)bd=ck.s==='ok'?'<div class="chk ok">✅ الصورة مطابقة لرقم الصنف</div>':
   ck.s==='bad'?'<div class="chk bad">⚠️ غير مطابق: المكتوب على الصورة <bdi dir="ltr" class="rc">'+esc(ck.r)+'</bdi><button class="btn ghost" data-usecode="'+p.id+'" type="button">اجعله رقم الصنف</button></div>':
@@ -728,7 +728,7 @@ function editCard(p){
  return '<article class="card'+(p.hidden?' hiddencard':'')+(p._dirty?' dirty':'')+(ck&&ck.s!=='ok'?' warncard':'')+'">'+bd+'<div class="ed"><div class="thumbs">'+th+'<label class="upl" title="إضافة صور" for="cardIn" data-pick="'+p.id+'">+</label></div>'+
  '<button class="hidebtn'+(p.hidden?' off':'')+'" data-hide="'+p.id+'" type="button">'+(p.hidden?'🚫 مخفي عن الزبائن — اضغط لإظهاره':'👁️ ظاهر للزبائن — اضغط لإخفائه')+'</button>'+
  '<label class="catl">📂 القسم<select data-f="cat" data-id="'+p.id+'"'+(catName(p.cat)?'':' class="miss"')+'><option value="">— اختر القسم —</option>'+CATS.map(function(c){return '<option value="'+c[0]+'"'+(p.cat===c[0]?' selected':'')+'>'+c[1]+'</option>'}).join('')+'</select></label>'+
- '<label>رقم الصنف<input data-f="code" data-id="'+p.id+'" value="'+esc(p.code)+'"></label>'+
+ (p.code==='صنف جديد'&&p.images&&p.images.length?linkSel(p):'')+'<label>رقم الصنف<input data-f="code" data-id="'+p.id+'" value="'+esc(p.code)+'"></label>'+
  '<label>اسم الصنف<input data-f="name" data-id="'+p.id+'" value="'+esc(p.name||'')+'"></label>'+
  '<label>المقاسات<input data-f="sizes" data-id="'+p.id+'" value="'+esc(p.sizes)+'"></label>'+
  '<div class="two"><label>عبوة الكرتونة<input type="number" min="1" inputmode="numeric" data-f="pack" data-id="'+p.id+'" value="'+p.pack+'"></label><label>سعر القطعة<input type="number" min="0" step="0.5" inputmode="decimal" data-f="price" data-id="'+p.id+'" value="'+p.price+'"></label></div>'+
@@ -737,6 +737,10 @@ function editCard(p){
  '<button class="btn acc" data-savep="'+p.id+'" type="button"'+(p._dirty?'':' disabled')+'>حفظ</button>'+
  '<button class="del" data-delp="'+p.id+'" type="button">حذف الصنف</button></div></article>';
 }
+function linkSel(p){var L=D.products.filter(function(q){return q.id!==p.id&&q.code!=='صنف جديد'}).sort(function(a,b){var ea=a.images&&a.images.length?1:0,eb=b.images&&b.images.length?1:0;return ea-eb||String(a.code).localeCompare(String(b.code))});
+ return '<img class="bigprev" src="'+p.images[0]+'" alt="" data-zp="'+p.id+'" data-zi="0"><div class="zhint">👆 اضغط على الصورة لتكبيرها وقراءة الرقم</div><label class="linkl">🔗 هذه الصورة لأي صنف؟<select data-link="'+p.id+'"><option value="">— اختر الصنف من القائمة —</option>'+L.map(function(q){return '<option value="'+q.id+'">'+esc(q.code)+(q.name&&q.name!==q.code?' — '+esc(q.name):'')+(q.images&&q.images.length?' (فيه صورة)':' (بدون صورة)')+'</option>'}).join('')+'</select><span>اختر رقم الصنف وتنتقل الصورة له تلقائياً، ويُحذف هذا الصنف الفارغ.</span></label>'}
+function linkTo(oid,tid){var o=find(oid),t=find(tid);if(!o||!t)return;toast('جارٍ نقل الصورة…');
+ Promise.all([getFull(o),getFull(t)]).then(function(R){t.images=(R[1]||[]).concat(R[0]||[]);t._full=true;t._dirty=true;return saveOne(t)}).then(function(){var F=fb.fs;return F.deleteDoc(F.doc(db,'products',oid)).then(function(){F.deleteDoc(F.doc(db,'imgs',oid)).catch(function(){});delete FULL[oid];D.products=D.products.filter(function(x){return x.id!==oid});render();toast('تم ربط الصورة بالصنف '+t.code+' ✅',4500)})},function(e){console.error(e);render();toast(e&&e.big?'الصور كبيرة جداً لهذا الصنف':permMsg(e),6000)})}
 function clean(p){return {code:p.code,name:p.name||'',cat:catName(p.cat)?p.cat:'',hidden:!!p.hidden,sizes:p.sizes,pack:Math.max(1,Math.round(p.pack)||1),price:Number(p.price)||0,stock:Math.max(0,Math.round(p.stock)||0),images:p.images||[],order:p.order||0}}
 /* ---------- fast images: small thumbnail in the product, full photos in imgs/{id} ---------- */
 var FULL={},THC={},unsubImgs=null;
@@ -807,7 +811,7 @@ function rejectOrder(id){
   });
  }).then(function(){toast('تم رفض الطلب وإرجاع الكمية للمخزون');window.open(waLink(o,false),'_blank')},function(e){console.error(e);toast(permMsg(e))});
 }
-function shrink(file){return new Promise(function(res,rej){var r=new FileReader();r.onload=function(){var im=new Image();im.onload=function(){var M=800,w=im.width,h=im.height,s=Math.min(1,M/Math.max(w,h));var c=document.createElement('canvas');c.width=Math.round(w*s);c.height=Math.round(h*s);c.getContext('2d').drawImage(im,0,0,c.width,c.height);res(c.toDataURL('image/jpeg',0.75))};im.onerror=rej;im.src=r.result};r.onerror=rej;r.readAsDataURL(file)})}
+function shrink(file,MX,Q){return new Promise(function(res,rej){var r=new FileReader();r.onload=function(){var im=new Image();im.onload=function(){var M=MX||1100,w=im.width,h=im.height,s=Math.min(1,M/Math.max(w,h));var c=document.createElement('canvas');c.width=Math.round(w*s);c.height=Math.round(h*s);c.getContext('2d').drawImage(im,0,0,c.width,c.height);res(c.toDataURL('image/jpeg',Q||0.8))};im.onerror=rej;im.src=r.result};r.onerror=rej;r.readAsDataURL(file)})}
 /* ---------- read data from photo (Gemini via Firebase AI Logic) ---------- */
 var SITE_KEY='6LcGwAYuAAAAAPq6Ali2RO7mZ9UkjftpyTr1ZEU7',MODELS=['gemini-3.8-flash','gemini-3-flash','gemini-2.5-flash'],aiP=null,aiBusy=0;
 var AIASK='هذه صورة إعلان لموديل أحذية لمحل جملة. اقرأ فقط النص المكتوب فعلاً على الصورة (عادة 3 أسطر قرب الشعار: رقم الموديل، ثم مدى المقاسات، ثم عدد الأزواج في الكرتونة مثل 15PRS). '+
@@ -836,7 +840,8 @@ function aiApply(p,r,force){var got=0;if(!r)return 0;
  if(got)p._dirty=true;return got}
 function ckey(x){return String(x||'').toLowerCase().replace(/[^a-z0-9]/g,'')}
 function findCode(code){var c=ckey(code),hit=null;if(!c)return null;D.products.forEach(function(p){if(!hit&&ckey(p.code)===c)hit=p});return hit}
-function byName(n){var b=String(n||'').replace(/\.[^.]+$/,'').trim();return findCode(b)||findCode(b.replace(/(\s*\(\d+\)|[\s_]+\d{1,2})$/,''))}
+function findLoose(code){var c=ckey(code);if(c.length<5)return null;var L=D.products.filter(function(p){return p.code!=='صنف جديد'&&(codeMatch(c,p.code)||codeMatch(c,p.name))});if(L.length===1)return L[0];var E=L.filter(function(p){return !(p.images&&p.images.length)});return E.length===1?E[0]:null}
+function byName(n){var b=String(n||'').replace(/\.[^.]+$/,'').trim(),b2=b.replace(/(\s*\(\d+\)|[\s_]+\d{1,2})$/,'');return findCode(b)||findCode(b2)||findLoose(b2)}
 var chk={},chkBusy=0,chkOnly=false;
 function chkSum(){var r={t:0,ok:0,bad:0,none:0};for(var k in chk){if(!find(k))continue;r.t++;r[chk[k].s==='ok'?'ok':chk[k].s==='bad'?'bad':'none']++}return r}
 function codeMatch(a,b){a=ckey(a);b=ckey(b);return !!a&&!!b&&(a===b||(a.length>=5&&b.length>=5&&(a.indexOf(b)>=0||b.indexOf(a)>=0)))}
@@ -853,9 +858,9 @@ var wakeL=null;function wake(on){try{if(on&&navigator.wakeLock&&!wakeL)navigator
 document.addEventListener('visibilitychange',function(){if(document.visibilityState==='visible'&&aiBusy>0)wake(true)});
 function photoBatch(files){aiBusy=files.length;wake(true);render();var made=0,attached=0,failed=0,saved=0,unsaved=0,lastErr=null,chain=Promise.resolve();
  function keep(t){return saveOne(t).then(function(){saved++},function(e){console.error(e);unsaved++})}
- files.forEach(function(f){chain=chain.then(function(){return shrink(f).then(function(src){
+ files.forEach(function(f){chain=chain.then(function(){var hi=null;return shrink(f).then(function(src){
   var fx=byName(f.name);if(fx&&fx.th&&!fx._full)return getFull(fx).then(function(L){fx.images=L.concat(src);fx._full=true;fx._dirty=true;attached++;return keep(fx)});if(fx){fx.images=(fx.images||[]).concat(src);fx._dirty=true;attached++;return keep(fx)}
-  return aiRead(src).then(function(r){var ex=findCode(r&&r.code);
+  return shrink(f,1800,0.88).then(function(h){return aiRead(h)},function(){return aiRead(src)}).then(function(r){var ex=findCode(r&&r.code)||findLoose(r&&r.code);
    if(ex&&ex.th&&!ex._full)return getFull(ex).then(function(L){ex.images=L.concat(src);ex._full=true;aiApply(ex,r,false);ex._dirty=true;attached++;return keep(ex)});if(ex){ex.images=(ex.images||[]).concat(src);aiApply(ex,r,false);ex._dirty=true;attached++;return keep(ex)}
    else{var np={id:'p'+Date.now().toString(36)+Math.floor(Math.random()*99),code:'صنف جديد',name:'',cat:catName(admCat)?admCat:'',sizes:'',pack:18,_newPack:1,price:0,stock:0,images:[src],order:D.products.length+1,_dirty:true};aiApply(np,r,true);D.products.push(np);made++;return keep(np)}
   },function(e){failed++;lastErr=e;var np={id:'p'+Date.now().toString(36)+Math.floor(Math.random()*99),code:'صنف جديد',name:'',cat:catName(admCat)?admCat:'',sizes:'',pack:18,price:0,stock:0,images:[src],order:D.products.length+1,_dirty:true};D.products.push(np);return keep(np)})
@@ -962,6 +967,8 @@ document.addEventListener('click',function(e){
  if(e.target.closest&&e.target.closest('[data-notif]')){askNotif();return}
  if(e.target.classList&&e.target.classList.contains('sheet')){e.target.remove();return}
  if(e.target.id==='zoom'){closeZoom();return}
+ if(e.target.id==='zImg'){var zz=document.getElementById('zoom');zz.classList.toggle('big');if(zz.classList.contains('big')){var im=e.target,rx=e.offsetX/im.clientWidth,ry=e.offsetY/im.clientHeight;requestAnimationFrame(function(){zz.scrollLeft=rx*zz.scrollWidth-zz.clientWidth/2;zz.scrollTop=ry*zz.scrollHeight-zz.clientHeight/2})}return}
+ if(e.target.dataset&&e.target.dataset.zp){var zp=find(e.target.dataset.zp),zi=+e.target.dataset.zi||0;if(zp){openZoom(zp);if(zi<zoomList.length){zoomI=zi;drawZoom()}var zh=document.getElementById('zoom');if(zh&&!zh.querySelector('.zhelp'))zh.insertAdjacentHTML('beforeend','<div class="zhelp">اضغط على الصورة للتكبير، واسحب لتحريكها</div>')}return}
  var t=e.target.closest('button,a');if(!t)return;var ds=t.dataset;
  if(ds.close){closeSheets();return}
  if(ds.zoom){openZoom(find(ds.zoom));return}
@@ -1043,7 +1050,7 @@ document.addEventListener('input',function(e){var t=e.target;
  if(t.id==='mCity')t.dataset.auto='';
  if(man&&(t.id==='mName'||t.id==='mCity'||t.id==='mNote'||t.id==='mTel'))manSync();
 });
-document.addEventListener('change',function(e){var t=e.target;if(t.id==='mFile'){var mf=t.files&&t.files[0];t.value='';if(mf)manImport(mf);return}if(t.dataset&&t.dataset.mq&&man){manSet(t.dataset.mq,Number(digits(t.value))||0);manDraw();return}if(t.id==='aiIn'){var af=[].slice.call(t.files||[]);t.value='';if(!af.length)return;if(!fbApp){toast('انتظر حتى يتصل النظام بالإنترنت ثم حاول مرة أخرى',4500);return}photoBatch(af);return}if(t.id==='xlsIn'){var xf=t.files&&t.files[0];t.value='';if(xf)xlRead(xf);return}if(t.id!=='cardIn'||!pickId)return;var p=find(pickId),fs=[].slice.call(t.files||[]);t.value='';if(!p||!fs.length||notReady(p))return;toast('جارٍ تجهيز الصور…');
+document.addEventListener('change',function(e){var t=e.target;if(t.dataset&&t.dataset.link){if(t.value)linkTo(t.dataset.link,t.value);return}if(t.id==='mFile'){var mf=t.files&&t.files[0];t.value='';if(mf)manImport(mf);return}if(t.dataset&&t.dataset.mq&&man){manSet(t.dataset.mq,Number(digits(t.value))||0);manDraw();return}if(t.id==='aiIn'){var af=[].slice.call(t.files||[]);t.value='';if(!af.length)return;if(!fbApp){toast('انتظر حتى يتصل النظام بالإنترنت ثم حاول مرة أخرى',4500);return}photoBatch(af);return}if(t.id==='xlsIn'){var xf=t.files&&t.files[0];t.value='';if(xf)xlRead(xf);return}if(t.id!=='cardIn'||!pickId)return;var p=find(pickId),fs=[].slice.call(t.files||[]);t.value='';if(!p||!fs.length||notReady(p))return;toast('جارٍ تجهيز الصور…');
  Promise.all(fs.map(shrink)).then(function(a){var first=!(p.images&&p.images.length);p.images=(p.images||[]).concat(a);p._dirty=true;render();if(first&&(!p.code||p.code==='صنف جديد'||!p.sizes))readCard(p)},function(){toast('تعذّرت قراءة إحدى الصور')})});
 window.addEventListener('hashchange',function(){storeMode=parseStore();if(storeMode){watchPrep();render();return}var a=/^#admin/i.test(location.hash);if(a!==isAdminUrl){isAdminUrl=a;closeSheets();subProducts();if(a&&user){watchOrders();watchPrepAll()}else if(!a&&unsubOrders){unsubOrders();unsubOrders=null;seenNew=null}render()}});
 
@@ -1083,7 +1090,7 @@ Promise.all([import(G+'firebase-app.js'),import(G+'firebase-firestore.js'),impor
 .mimp{margin:12px 0 6px}.mimp .scan{cursor:pointer}
 .impbox{border:2px solid var(--accent);border-radius:14px;padding:12px;margin:8px 0;display:flex;flex-direction:column;gap:8px}
 .impbox td small{display:block}
-.missbox{background:#fff4e0;border:1.5px solid #e0a040;border-radius:12px;padding:10px 12px;display:flex;flex-direction:column;gap:6px}.missbox span{font-size:.85rem;color:#8a4b00}.missbox ol{margin:0;padding:0 20px 0 0;font-size:.95rem;line-height:1.8}.btn:disabled{opacity:.45}.impbox tr.nomatch td{background:#fdecea}
+.thumbs .t img{cursor:zoom-in}.bigprev{width:100%;max-height:340px;object-fit:contain;background:#fff;border-radius:12px;border:2px solid #e0a040;cursor:zoom-in}.zhint{text-align:center;font-size:.85rem;color:#8a4b00;margin:-2px 0 4px}#zoom.big{display:block;overflow:auto;-webkit-overflow-scrolling:touch}#zoom.big img{max-width:none;max-height:none;width:300%;border-radius:0;cursor:zoom-out}#zoom.big .zt,#zoom.big .zn,#zoom.big .zhelp{position:fixed}#zoom .zhelp{position:absolute;bottom:calc(70px + env(safe-area-inset-bottom,0px));left:0;right:0;text-align:center;color:#fff;font-size:.85rem;opacity:.85}#zoom img{cursor:zoom-in}.linkl{background:#fff4e0;border:1.5px solid #e0a040;border-radius:12px;padding:8px 10px}.linkl select{font-weight:700}.linkl span{display:block;font-size:.8rem;color:#8a4b00;margin-top:4px}.missbox{background:#fff4e0;border:1.5px solid #e0a040;border-radius:12px;padding:10px 12px;display:flex;flex-direction:column;gap:6px}.missbox span{font-size:.85rem;color:#8a4b00}.missbox ol{margin:0;padding:0 20px 0 0;font-size:.95rem;line-height:1.8}.btn:disabled{opacity:.45}.impbox tr.nomatch td{background:#fdecea}
 .mcats{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0 2px}
 .mbr{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin:0 0 6px;font-size:.85rem;color:var(--muted)}
 .chip{border:1.5px solid var(--line);background:var(--bg);color:var(--ink);border-radius:999px;padding:8px 16px;font-weight:700;font-size:.95rem}.chip.on{background:var(--accent);border-color:var(--accent);color:#fff}
