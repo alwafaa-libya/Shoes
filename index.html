@@ -272,6 +272,10 @@ var app=document.getElementById('app');
 var pickId=null;document.addEventListener('click',function(e){var l=e.target.closest&&e.target.closest('[data-pick]');if(l)pickId=l.dataset.pick},true);
 var cart={},cust={name:'',city:'',tel:'',note:''},curInv=null;
 var fbApp=null,fb=null,db=null,auth=null,live=false,dbErr='',user=null;
+/* إشعار تيليجرام للمدير عند كل طلب جديد — رمز البوت (token) ورقم حساب المدير (chat) */
+var TG_NOTIFY={token:'9082293769:AAE-7PjK79tj_-ZKg6ouhnOlWDp46Qnft7w',chat:'1099953404'};
+/* إشعار واتساب (CallMeBot) — احتياطي */
+var WA_NOTIFY={phone:'218915101605',key:''};
 var ordTab='new';var isAdminUrl=/^#admin/i.test(location.hash),adminTab='orders',orders=[],ordersErr='',unsubOrders=null,seenNew=null,busy=false;
 var zoomList=[],zoomI=0,zoomTitle='';
 var CATS=[['men','رجالي','👞'],['women','نسائي','👠'],['boys','أولاد','👟'],['girls','بنات','🎀']];
@@ -461,7 +465,7 @@ function sendOrder(){
    tx.set(F.doc(F.collection(db,'orders')),{no:no,date:today(),status:'new',createdAt:F.serverTimestamp(),customer:{name:cust.name,city:cust.city,tel:cust.tel,note:cust.note},lines:L,totals:T});
   });
  }).then(function(){
-  busy=false;cart={};saveCart();curInv=null;render();
+  busy=false;cart={};saveCart();curInv=null;render();notifyOwner(lastOrder);
   sheet('okS','تم إرسال الطلب','<div class="okbox"><div class="okic">✓</div><h2>تم إرسال طلبك بنجاح</h2><p class="note">سيصلك رد بقبول الطلب على الواتساب على الرقم <span class="num">'+esc(cust.tel)+'</span> قريباً.</p></div>'+
   '<p class="note" style="text-align:center;margin:10px 0 0"><b>هذه نسختك من الفاتورة:</b></p>'+paperHtml(lastOrder)+
   '<div class="acts"><button class="btn acc lg" id="saveInv" type="button">📥 حفظ صورة الفاتورة</button><a class="wa" id="selfWa" href="https://wa.me/'+waOf(cust.tel)+'?text='+encodeURIComponent(orderText(lastOrder))+'" target="_blank" rel="noopener">إرسال نسخة إلى واتسابي</a><button class="btn ghost" data-close="1" type="button">تم</button></div>');
@@ -632,6 +636,7 @@ function renderAdmin(){
  }else if(adminTab==='orders'){
   h+='<button class="btn acc manbtn" id="openMan" type="button">🏬 فاتورة يدوية — توزيع على فرع'+(man&&man.ord.length?' <small>(مسودة: '+man.ord.length+' صنف)</small>':'')+'</button>';
   h+='<div class="storeset"><label>رقم واتساب المخزن<input id="storeNum" type="tel" dir="ltr" inputmode="tel" placeholder="09xxxxxxxx" value="'+esc(storeNum())+'"></label><small>يُحفظ على هذا الجهاز. إذا تركته فارغاً، يسألك الواتساب لمن ترسل (شخص أو مجموعة).</small></div>';
+  h+='<div class="storeset"><label>🔔 إشعارات الطلبات الجديدة</label>'+(notifOn()?'<small>✅ الإشعارات مفعّلة على هذا الجهاز: صوت وإشعار عند وصول أي طلب ما دامت هذه الصفحة مفتوحة.</small>':'<button class="btn acc" data-notif="1" type="button">تفعيل الإشعارات على هذا الجهاز</button><small>اضغط مرة واحدة واختر «سماح».</small>')+'<small>'+(phoneOn()?'✅ إشعار تيليجرام مفعّل: تصلك رسالة على هاتفك مع كل طلب.':'⚠️ إشعار تيليجرام غير مفعّل بعد.')+'</small></div>';
   if(ordersErr)h+='<p class="err">'+esc(ordersErr)+'</p>';
   else if(!orders.length)h+='<p class="empty">لا توجد طلبات بعد. أي طلب يرسله زبون يظهر هنا فوراً.</p>';
   else{
@@ -926,16 +931,35 @@ function watchOrders(){
  unsubOrders=F.onSnapshot(F.query(F.collection(db,'orders'),F.orderBy('createdAt','desc'),F.limit(500)),function(s){
   orders=s.docs.map(function(d){var x=d.data();x.id=d.id;return x});ordersErr='';
   var nNew=orders.filter(function(o){return o.status==='new'}).length;
-  if(seenNew!==null&&nNew>seenNew){toast('🔔 وصل طلب جديد',4000);beep()}
+  if(seenNew!==null&&nNew>seenNew){newOrderAlert(orders.filter(function(o){return o.status==='new'})[0])}
   seenNew=nNew;document.title=(nNew?'('+nNew+') ':'')+'لوحة الإدارة';
   if(!editing())render();
  },function(e){console.error(e);ordersErr=e.code==='permission-denied'?'هذا الحساب لا يملك صلاحية رؤية الطلبات. تأكد من قواعد الأمان.':'تعذّر تحميل الطلبات.';render()});
 }
-function beep(){try{var a=new (window.AudioContext||window.webkitAudioContext)(),o=a.createOscillator(),g=a.createGain();o.connect(g);g.connect(a.destination);o.frequency.value=880;g.gain.value=.15;o.start();o.stop(a.currentTime+.35)}catch(e){}}
+var AC=null;function acx(){try{if(!AC)AC=new (window.AudioContext||window.webkitAudioContext)();if(AC.state==='suspended')AC.resume()}catch(e){}return AC}
+['pointerdown','keydown','touchstart'].forEach(function(ev){document.addEventListener(ev,function(){acx()},{passive:true})});
+function beep(){var a=acx();if(a){try{var t=a.currentTime;[0,.45].forEach(function(d){[[988,0],[1319,.15]].forEach(function(n){var o=a.createOscillator(),g=a.createGain();o.type='sine';o.connect(g);g.connect(a.destination);o.frequency.value=n[0];var s=t+d+n[1];g.gain.setValueAtTime(.0001,s);g.gain.exponentialRampToValueAtTime(.35,s+.02);g.gain.exponentialRampToValueAtTime(.0001,s+.3);o.start(s);o.stop(s+.32)})})}catch(e){}}
+ try{navigator.vibrate&&navigator.vibrate([250,120,250])}catch(e){}}
+var SWR=null;function regSW(){try{if(!SWR&&'serviceWorker' in navigator)navigator.serviceWorker.register('sw.js').then(function(r){SWR=r}).catch(function(){})}catch(e){}}if(isAdminUrl)regSW();
+function notifOn(){return 'Notification' in window&&Notification.permission==='granted'}
+function askNotif(){regSW();if(!('Notification' in window)){toast('هذا المتصفح لا يدعم الإشعارات. اعتمد على إشعار تيليجرام.',4500);return}
+ Notification.requestPermission().then(function(r){if(r==='granted'){toast('✅ تم تفعيل الإشعارات على هذا الجهاز',3500);setTimeout(function(){sysNotif('🔔 تجربة','هكذا سيظهر إشعار الطلب الجديد')},800)}else toast('لم يتم السماح بالإشعارات. يمكنك السماح بها من إعدادات المتصفح.',5000);render()})}
+function sysNotif(title,body){if(!notifOn())return;var op={body:body,icon:'icon-192.png',badge:'icon-192.png',tag:'wf-order',renotify:true,dir:'rtl',lang:'ar'};
+ try{if(SWR&&SWR.showNotification){SWR.showNotification(title,op);return}}catch(e){}try{new Notification(title,op)}catch(e){}}
+var flashT=null;function flashTitle(){if(flashT)clearInterval(flashT);var on=false,base=document.title;if(!document.hidden)return;
+ flashT=setInterval(function(){if(!document.hidden){clearInterval(flashT);flashT=null;document.title=base;return}on=!on;document.title=on?'🔔 طلب جديد!':base},1000)}
+function newOrderAlert(o){toast('🔔 وصل طلب جديد'+(o&&o.customer&&o.customer.name?' من '+o.customer.name:''),5000);beep();
+ sysNotif('🔔 طلب جديد — الوفاء المتميز',(o&&o.customer?(o.customer.name||'')+(o.customer.city?' — '+o.customer.city:''):'')+(o&&o.totals?'\nالإجمالي: '+money(o.totals.t)+' د.ل':''));flashTitle()}
+function phoneOn(){return !!(TG_NOTIFY.token&&TG_NOTIFY.chat)||!!WA_NOTIFY.key}
+function notifyOwner(o){if(!o||!phoneOn())return;var c=o.customer||{},T=o.totals||{};
+ var t='🔔 طلب جديد في منظومة الوفاء المتميز\nرقم الفاتورة: '+o.no+'\nالزبون: '+(c.name||'—')+(c.city?'\nالمدينة: '+c.city:'')+(c.tel?'\nالهاتف: '+c.tel:'')+'\nالأصناف: '+(o.lines||[]).length+' — '+(T.c||0)+' كرتونة\nالإجمالي: '+money(T.t||0)+' د.ل\nافتح لوحة الإدارة: https://alwafaa-libya.github.io/Shoes/admin/';
+ if(TG_NOTIFY.token&&TG_NOTIFY.chat){try{fetch('https://api.telegram.org/bot'+TG_NOTIFY.token+'/sendMessage?chat_id='+encodeURIComponent(TG_NOTIFY.chat)+'&text='+encodeURIComponent(t),{mode:'no-cors',keepalive:true}).catch(function(){})}catch(e){}}
+ if(WA_NOTIFY.key){try{fetch('https://api.callmebot.com/whatsapp.php?phone='+WA_NOTIFY.phone+'&apikey='+encodeURIComponent(WA_NOTIFY.key)+'&text='+encodeURIComponent(t),{mode:'no-cors',keepalive:true}).catch(function(){})}catch(e){}}}
 function editing(){var a=document.activeElement;return isAdminUrl&&adminTab==='stock'&&a&&a.dataset&&a.dataset.f}
 
 /* ---------- events ---------- */
 document.addEventListener('click',function(e){
+ if(e.target.closest&&e.target.closest('[data-notif]')){askNotif();return}
  if(e.target.classList&&e.target.classList.contains('sheet')){e.target.remove();return}
  if(e.target.id==='zoom'){closeZoom();return}
  var t=e.target.closest('button,a');if(!t)return;var ds=t.dataset;
