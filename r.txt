@@ -6,6 +6,13 @@ service cloud.firestore {
       return request.auth != null && request.auth.token.email.lower() == "kalzunni@gmail.com";
     }
 
+    function isBranch() {
+      return request.auth != null && request.auth.token.email.lower() in [
+        "tripoli@alwafaa.ly", "misrata@alwafaa.ly", "ajdabiya@alwafaa.ly", "benghazi@alwafaa.ly",
+        "maarad@alwafaa.ly", "bayda@alwafaa.ly", "tobruk@alwafaa.ly"
+      ];
+    }
+
     match /products/{id} {
       allow read: if true;
       allow create, delete: if isOwner();
@@ -17,12 +24,26 @@ service cloud.firestore {
       );
     }
 
+    match /imgs/{id} {
+      allow read: if true;
+      allow write: if isOwner();
+    }
+
     match /orders/{id} {
-      allow create: if request.resource.data.status == 'new'
-                    && request.resource.data.createdAt == request.time
-                    && request.resource.data.lines is list
-                    && request.resource.data.lines.size() > 0;
-      allow read, update, delete: if isOwner();
+      allow create: if isOwner()
+                    || (request.resource.data.status == 'new'
+                        && request.resource.data.createdAt == request.time
+                        && request.resource.data.lines is list
+                        && request.resource.data.lines.size() > 0)
+                    || (isBranch()
+                        && request.resource.data.status == 'accepted'
+                        && request.resource.data.manual == true
+                        && request.resource.data.branchBy == request.auth.token.email.lower()
+                        && request.resource.data.lines is list
+                        && request.resource.data.lines.size() > 0);
+      allow read: if isOwner()
+                  || (isBranch() && resource.data.branchBy == request.auth.token.email.lower());
+      allow update, delete: if isOwner();
     }
 
     match /prep/{orderId} {
