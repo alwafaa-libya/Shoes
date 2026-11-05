@@ -37,6 +37,8 @@ header.top{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:spac
 .sub{margin:4px 0 0;color:var(--muted)}
 .tag{display:inline-block;background:var(--accent);color:var(--accent-ink);font-weight:700;padding:0 12px;border-radius:99px;font-size:.85rem}
 .ownerbar{display:flex;flex-wrap:wrap;gap:8px}
+.sitebox{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:10px;border-radius:16px;padding:12px 16px;margin:0 0 14px;border:2px solid #1e7a4f;background:#e7f5ee}.sitebox.off{border-color:#b3261e;background:#fdecea}.sitebox b{display:block;font-size:1rem}.sitebox span{font-size:.85rem;color:#444}.sitebox input{width:100%;margin-top:6px;padding:8px;border:1px solid #ccc;border-radius:8px;font:inherit}.sitebox>div{flex:1 1 240px}.sitebox .btn{white-space:nowrap}
+.closedpg{min-height:80vh;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;gap:14px;padding:30px 20px}.closedpg .logo{width:96px;height:96px}.closedpg h2{margin:0;font-size:1.4rem}.closedpg p{margin:0;font-size:1.05rem;line-height:1.8;max-width:420px;white-space:pre-line}.closedpg a{display:inline-block;background:#1e7a4f;color:#fff;border-radius:12px;padding:10px 18px;text-decoration:none;font-weight:700}
 .btn{border:0;border-radius:12px;padding:9px 16px;font-weight:700;background:var(--ink);color:var(--bg)}
 .btn.acc{background:var(--accent);color:var(--accent-ink)}
 .btn.ghost{background:transparent;color:var(--ink);border:1.5px solid var(--line)}
@@ -282,6 +284,12 @@ var app=document.getElementById('app');
 var pickId=null;document.addEventListener('click',function(e){var l=e.target.closest&&e.target.closest('[data-pick]');if(l)pickId=l.dataset.pick},true);
 var cart={},cust={name:'',city:'',tel:'',note:''},curInv=null;
 var fbApp=null,fb=null,db=null,auth=null,live=false,dbErr='',user=null;
+/* وضع الصيانة: يُحفظ في products/_site (closed + msg) */
+var SITE={closed:false,msg:''},siteSub=null,SITE_MSG='المنظومة قيد التحديث والتطوير الآن.\nنعود إليكم قريباً بإذن الله 🌷';
+function watchSite(){if(siteSub||!fb||!db)return;var F=fb.fs;siteSub=F.onSnapshot(F.doc(db,'products','_site'),function(d){SITE=d.exists()?d.data():{closed:false,msg:''};if(SITE.closed&&!user&&!isAdminUrl&&!storeMode)closeSheets();if(!editing())render()},function(e){console.warn('site',e)})}
+function renderClosed(){app.innerHTML='<div class="wrap"><div class="closedpg"><img class="logo" src="'+LOGO+'" alt="TS"><h2 class="brand">'+esc(D.shop)+'</h2><p>🔧 '+esc(SITE.msg||SITE_MSG)+'</p><a href="https://wa.me/218915101605" target="_blank" rel="noopener">تواصل معنا على واتساب</a></div></div>'}
+function siteBox(){var c=!!SITE.closed;return '<div class="sitebox'+(c?' off':'')+'"><div><b>'+(c?'🔒 الموقع مغلق الآن للزبائن (وضع التطوير)':'✅ الموقع يعمل الآن للزبائن')+'</b><span>'+(c?'الزبائن يرون رسالة الصيانة فقط ولا يستطيعون الطلب. أنت تستطيع فتح صفحة الزبائن من هذا الجهاز وتجربتها عادي.':'عند الإيقاف يرى الزبائن رسالة الصيانة بدل المتجر. الرابط نفسه لا يتغير.')+'</span><input id="siteMsg" type="text" placeholder="رسالة الصيانة للزبائن" value="'+esc(SITE.msg||SITE_MSG.replace(/\n/g,' '))+'"></div><button class="btn '+(c?'acc':'ghost dng')+'" id="siteTgl" type="button">'+(c?'🔓 فتح الموقع للزبائن':'🔒 إيقاف الموقع للتطوير')+'</button></div>'}
+function siteToggle(btn){var c=!SITE.closed;if(c&&!btn.dataset.sure){btn.dataset.sure='1';btn.textContent='متأكد؟ اضغط مرة ثانية للإيقاف';return}var mi=document.getElementById('siteMsg'),m=(mi&&mi.value||'').trim()||SITE_MSG;btn.disabled=true;var F=fb.fs;F.setDoc(F.doc(db,'products','_site'),{closed:c,msg:m,at:Date.now()},{merge:true}).then(function(){SITE.closed=c;SITE.msg=m;render();toast(c?'🔒 تم إيقاف الموقع للزبائن':'🔓 تم فتح الموقع للزبائن',4000)},function(e){console.error(e);btn.disabled=false;toast(permMsg(e),4500)})}
 /* إشعار تيليجرام للمدير عند كل طلب جديد — رمز البوت (token) ورقم حساب المدير (chat) */
 var TG_NOTIFY={token:'9082293769:AAE-7PjK79tj_-ZKg6ouhnOlWDp46Qnft7w',chat:'1099953404'};
 /* إشعار واتساب (CallMeBot) — احتياطي */
@@ -329,10 +337,12 @@ try{var cs=JSON.parse(localStorage.getItem('wf_cust')||'null');if(cs)cust=Object
 function render(){
  if(storeMode){renderStore();return}
  if(isAdminUrl){renderAdmin();return}
+ if(SITE.closed&&!user){renderClosed();return}
  var h='<div class="wrap"><header class="top"><div><div class="brandrow"><img class="logo" src="'+LOGO+'" alt="TS"><h1 class="brand">'+esc(D.shop)+'<small>'+esc(D.shopLatin||'')+'</small></h1></div>'+
  '<p class="sub"><span class="tag">جملة فقط</span> تشكيلة أحذية — اطلب بالكرتونة، والكمية المتوفرة تتحدث مباشرة.</p></div>';
  h+='<button class="cartbtn" id="openCart" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 4h2l2.4 11.2a1.5 1.5 0 0 0 1.5 1.2h8.6a1.5 1.5 0 0 0 1.5-1.2L21 8H6.2"/><circle cx="9.5" cy="20" r="1.3"/><circle cx="17" cy="20" r="1.3"/></svg>السلة<span class="bdg num">'+cartCount()+'</span></button>';
  h+='</header>';
+ if(SITE.closed)h+='<p class="note live" style="background:#fdecea;color:#b3261e;font-weight:700">🔒 الموقع مغلق الآن للزبائن (وضع التطوير). أنت تراه لأنك المدير.</p>';
  h+=newsBar();
  if(dbErr)h+='<p class="note live">⚠️ تعذّر الاتصال بالمخزون المباشر. تأكد من الإنترنت ثم حدّث الصفحة.</p>';
  if(!custCat){
@@ -665,6 +675,7 @@ function renderAdmin(){
   app.innerHTML=h;return}
  var nNew=orders.filter(function(o){return o.status==='new'}).length;
  h+='<div class="tabs"><button class="tab'+(adminTab==='orders'?' on':'')+'" data-tab="orders" type="button">الطلبات'+(nNew?' <span class="bdg num">'+nNew+'</span>':'')+'</button><button class="tab'+(adminTab==='stock'?' on':'')+'" data-tab="stock" type="button">البضاعة والمخزون</button><button class="tab'+(adminTab==='shop'?' on':'')+'" data-tab="shop" type="button">المتجر</button></div>';
+ h+=siteBox();
  if(adminTab==='shop'){
   var shown=D.products.filter(function(p){return p.stock>0&&p.price>0&&!p.hidden&&!p.pend}),hid=D.products.length-shown.length,pc=catCounts(shown);shown=shown.filter(function(p){return inCat(p,pvCat)});
   h+='<div class="scanbox"><div><b>👁️ هكذا يرى الزبائن المتجر</b><span>'+shown.length+' صنف ظاهر للزبائن'+(hid?' — و'+hid+' صنف مخفي (مخفي بالزر، أو بدون سعر، أو بدون كمية)':'')+'. اضغط على أي صورة لتكبيرها.</span></div><a class="scan" href="https://alwafaa-libya.github.io/Shoes/" target="_blank" rel="noopener">فتح صفحة الزبائن</a></div>';
@@ -720,7 +731,16 @@ function orderCard(o){
  '<button class="delo" data-delo="'+o.id+'" type="button">🗑️ حذف الفاتورة</button>'+
  '</article>';
 }
-function waLink(o,ok){var c=o.customer||{},T=o.totals||{};
+var RJT={cap:function(o){var c=o.customer||{};return 'مرحباً '+(c.name||'')+'،\nبخصوص طلبكم رقم '+o.no+':\n\nنعتذر منكم، لم يسمح النظام بتمرير هذه الفاتورة لأن قيمتها تتجاوز السقف المسموح به في حسابكم.\n\nولإتمام طلبكم، يُرجى سداد دفعة من المستحقات السابقة أو جزء من قيمة الفاتورة، وبعدها تمرّ الفاتورة مباشرة ويتم تجهيز طلبكم ✅\n\nللتنسيق تواصلوا معنا على هذا الرقم.\nشاكرين حسن تعاملكم 🌷\n'+D.shop},
+ gen:function(o){var c=o.customer||{};return 'مرحباً '+(c.name||'')+'،\nنعتذر، لم نتمكن من قبول طلبكم رقم '+o.no+'.\n'+D.shop}};
+function openReject(id){var o=orders.filter(function(x){return x.id===id})[0];if(!o)return;
+ sheet('rjS','سبب الرفض','<div class="shd"><h2>رفض الطلب '+esc(o.no)+'</h2><button class="x" data-close="1" type="button" aria-label="إغلاق">✕</button></div>'+
+ '<p class="note">اختر سبب الرفض. هذه الرسالة تُرسل للزبون على واتساب، وتقدر تعدّل نصها قبل الإرسال.</p>'+
+ '<div class="two-b"><button class="btn ghost" data-rjt="cap" type="button">💳 تجاوز السقف المسموح</button><button class="btn ghost" data-rjt="gen" type="button">اعتذار عام</button></div>'+
+ '<textarea id="rjMsg" dir="rtl" style="width:100%;min-height:230px;margin:10px 0;padding:10px;border:1px solid #ccc;border-radius:10px;font:inherit;line-height:1.7;box-sizing:border-box">'+esc(RJT.cap(o))+'</textarea>'+
+ '<div class="acts"><button class="btn acc lg" data-rjgo="'+id+'" type="button">رفض الطلب وإرجاع الكمية وإرسال الرسالة</button><button class="btn ghost" data-close="1" type="button">تراجع</button></div>')}
+function waLink(o,ok,msg){var c=o.customer||{},T=o.totals||{};
+ if(msg)return 'https://wa.me/'+waOf(c.tel)+'?text='+encodeURIComponent(msg);
  var t=ok?('مرحباً '+(c.name||'')+'،\nتم قبول طلبكم رقم '+o.no+' ✅\nسنتواصل معكم لترتيب التسليم.\n\n'+orderText(o)):
  ('مرحباً '+(c.name||'')+'،\nنعتذر، لم نتمكن من قبول طلبكم رقم '+o.no+'.\n'+D.shop);
  return 'https://wa.me/'+waOf(c.tel)+'?text='+encodeURIComponent(t)}
@@ -839,16 +859,16 @@ function xlOrders(k){var L=orders.filter(function(o){return (o.status||'new')===
   var ws=X.utils.aoa_to_sheet(rows);ws['!cols']=[{wch:14},{wch:12},{wch:11},{wch:18},{wch:12},{wch:14},{wch:16},{wch:18},{wch:10},{wch:9},{wch:8},{wch:11},{wch:11},{wch:20}];
   var wb=X.utils.book_new();X.utils.book_append_sheet(wb,ws,'الفواتير');X.writeFile(wb,'فواتير-'+(SLB[k]||k)+'-'+today().replace(/\//g,'-')+'.xlsx');toast('تم تنزيل نسخة الإكسل',3000)
  },function(){toast('تعذّر تحميل أداة الإكسل. تأكد من الإنترنت.')})}
-function rejectOrder(id){
+function rejectOrder(id,msg){
  var o=orders.filter(function(x){return x.id===id})[0];if(!o)return;var F=fb.fs;
  F.runTransaction(db,function(tx){
   var L=o.lines||[],refs=L.map(function(l){return F.doc(db,'products',l.id)}),oref=F.doc(db,'orders',id);
   return Promise.all([tx.get(oref)].concat(refs.map(function(r){return tx.get(r)}))).then(function(s){
    if(s[0].data().status!=='new')return;
    s.slice(1).forEach(function(ps,i){if(ps.exists())tx.update(refs[i],{stock:(ps.data().stock||0)+L[i].q})});
-   tx.update(oref,{status:'rejected',doneAt:F.serverTimestamp()});
+   tx.update(oref,{status:'rejected',doneAt:F.serverTimestamp(),rejectMsg:msg||''});
   });
- }).then(function(){toast('تم رفض الطلب وإرجاع الكمية للمخزون');window.open(waLink(o,false),'_blank')},function(e){console.error(e);toast(permMsg(e))});
+ }).then(function(){closeSheets();toast('تم رفض الطلب وإرجاع الكمية للمخزون');window.open(waLink(o,false,msg),'_blank')},function(e){console.error(e);toast(permMsg(e))});
 }
 function shrink(file,MX,Q){return new Promise(function(res,rej){var r=new FileReader();r.onload=function(){var im=new Image();im.onload=function(){var M=MX||1100,w=im.width,h=im.height,s=Math.min(1,M/Math.max(w,h));var c=document.createElement('canvas');c.width=Math.round(w*s);c.height=Math.round(h*s);c.getContext('2d').drawImage(im,0,0,c.width,c.height);res(c.toDataURL('image/jpeg',Q||0.8))};im.onerror=rej;im.src=r.result};r.onerror=rej;r.readAsDataURL(file)})}
 /* ---------- read data from photo (Gemini via Firebase AI Logic) ---------- */
@@ -947,7 +967,8 @@ function xlSave(){var F=fb.fs,b=F.writeBatch(db),ord=D.products.reduce(function(
  xlPlan.forEach(function(x){var d=x.d;if(x.ex){b.set(F.doc(db,'products',x.ex.id),d,{merge:true})}else{var nd={code:d.code,name:d.name||'',cat:d.cat||(catName(admCat)?admCat:''),sizes:d.sizes||'',pack:Math.max(1,d.pack||18),price:d.price||0,stock:Math.max(0,d.stock||0),images:[],order:++ord,pend:true};b.set(F.doc(db,'products','p'+Date.now().toString(36)+(n++)),nd)}});
  var g=document.getElementById('xlGo');if(g){g.disabled=true;g.textContent='جارٍ الحفظ…'}
  var anyNew=xlPlan.some(function(x){return !x.ex});b.commit().then(function(){closeSheets();if(anyNew){admCat='pend';render();scrollTo(0,0)}toast(anyNew?'تم حفظ الأصناف في «الدفعة الجديدة» ✅ أضف الصور ثم اعتمدها':'تم تحديث '+xlPlan.length+' صنف ✅',5000)},function(e){console.error(e);if(g){g.disabled=false;g.textContent='حفظ'}toast(permMsg(e),4500)})}
-function onProducts(s){
+function onProducts(s0){
+  var s={docs:s0.docs.filter(function(d){return d.id.charAt(0)!=='_'})};s.empty=!s.docs.length;
   s.docs.forEach(function(d){var x=d.data();x.id=d.id;KNOWN[d.id]=x});
   if(!s.empty){
    var dirtyMap={};D.products.forEach(function(p){if(p._dirty)dirtyMap[p.id]=p});
@@ -1044,7 +1065,9 @@ document.addEventListener('click',function(e){
  if(ds.mcat&&man){man.cat=ds.mcat;manDrawRes();return}
  if(ds.mbr!=null){var mn=document.getElementById('mName'),mc=document.getElementById('mCity');if(mn){var BC={'الرجالي بنغازي':'بنغازي','المعرض':''},cv=BC.hasOwnProperty(ds.mbr)?BC[ds.mbr]:ds.mbr;if(mc&&(!mc.value||mc.value===mn.value||mc.dataset.auto==='1')){mc.value=cv;mc.dataset.auto='1'}mn.value=ds.mbr;manSync();document.querySelectorAll('[data-mbr]').forEach(function(c){c.classList.toggle('on',c.dataset.mbr===ds.mbr)})}return}
  if(ds.minc||ds.mdec||ds.mrm){manSync();var mi=ds.minc||ds.mdec||ds.mrm;manSet(mi,ds.mrm?0:(man.L[mi]||0)+(ds.minc?1:-1));if(ds.minc&&!ds.mrm&&t.classList.contains('madd')){var mp2=find(mi);if(mp2)toast('أُضيف '+mp2.code+' — '+cartons(man.L[mi]||0))}manDraw();return}
- if(ds.reject){if(ds.sure)rejectOrder(ds.reject);else{ds.sure='1';t.textContent='اضغط مرة ثانية لتأكيد الرفض'}return}
+ if(ds.reject){openReject(ds.reject);return}
+ if(ds.rjt){var ro=orders.filter(function(x){return x.id===(document.querySelector('[data-rjgo]')||{}).dataset.rjgo})[0],ta=document.getElementById('rjMsg');if(ro&&ta)ta.value=RJT[ds.rjt](ro);return}
+ if(ds.rjgo){var rm=(document.getElementById('rjMsg').value||'').trim();t.disabled=true;t.textContent='جارٍ الرفض…';rejectOrder(ds.rjgo,rm);return}
  if(ds.readai){readCard(find(ds.readai));return}
  if(ds.savep){var sp=find(ds.savep);sp._dirty=false;saveProduct(sp);return}
  if(ds.delp){if(ds.sure){var dp=ds.delp;fb.fs.deleteDoc(fb.fs.doc(db,'products',dp)).then(function(){fb.fs.deleteDoc(fb.fs.doc(db,'imgs',dp)).catch(function(){});delete FULL[dp];toast('تم حذف الصنف')},function(er){toast(permMsg(er))})}else{ds.sure='1';t.textContent='اضغط مرة ثانية لتأكيد الحذف'}return}
@@ -1070,7 +1093,7 @@ document.addEventListener('click',function(e){
   case 'seed':seed();return;
   case 'delAll':if(ds.sure!=='2'){ds.sure=ds.sure?'2':'1';t.textContent=ds.sure==='1'?'متأكد؟ اضغط مرة ثانية':'آخر تأكيد: اضغط لحذف الكل نهائياً';return}
    t.disabled=true;t.textContent='جارٍ الحذف…';
-   (function(){var F=fb.fs;F.getDocs(F.collection(db,'products')).then(function(q){var docs=q.docs,i=0,jobs=[];while(i<docs.length){var b=F.writeBatch(db);docs.slice(i,i+400).forEach(function(d){b.delete(d.ref)});jobs.push(b.commit());i+=400}return Promise.all(jobs).then(function(){F.getDocs(F.collection(db,'imgs')).then(function(q2){var b2=F.writeBatch(db);q2.docs.slice(0,450).forEach(function(d){b2.delete(d.ref)});return b2.commit()}).catch(function(){});FULL={};return docs.length})}).then(function(n){cart={};curInv=null;saveCart();toast('تم حذف '+n+' صنف. يمكنك الآن رفع ملف الإكسل والصور الجديدة ✅',5000)},function(er){console.error(er);toast(permMsg(er),5000);render()})})();
+   (function(){var F=fb.fs;F.getDocs(F.collection(db,'products')).then(function(q){var docs=q.docs.filter(function(d){return d.id.charAt(0)!=='_'}),i=0,jobs=[];while(i<docs.length){var b=F.writeBatch(db);docs.slice(i,i+400).forEach(function(d){b.delete(d.ref)});jobs.push(b.commit());i+=400}return Promise.all(jobs).then(function(){F.getDocs(F.collection(db,'imgs')).then(function(q2){var b2=F.writeBatch(db);q2.docs.slice(0,450).forEach(function(d){b2.delete(d.ref)});return b2.commit()}).catch(function(){});FULL={};return docs.length})}).then(function(n){cart={};curInv=null;saveCart();toast('تم حذف '+n+' صنف. يمكنك الآن رفع ملف الإكسل والصور الجديدة ✅',5000)},function(er){console.error(er);toast(permMsg(er),5000);render()})})();
    return;
   case 'xlsTpl':xlTemplate();return;
   case 'saveAll':saveAll();return;
@@ -1081,6 +1104,7 @@ document.addEventListener('click',function(e){
   case 'xlGo':xlSave();return;
   case 'bulkGo':bulkCat(t);return;
   case 'bulkHide':case 'bulkShow':bulkHide(t,t.id==='bulkHide');return;
+  case 'siteTgl':siteToggle(t);return;
   case 'addProd':var np={newAt:admCat==='pend'?0:Date.now(),pend:admCat==='pend',id:'p'+Date.now().toString(36),code:'صنف جديد',cat:catName(admCat)?admCat:'',sizes:'',pack:18,price:50,stock:0,images:[],order:D.products.length+1,_dirty:true};D.products.push(np);render();return;
   case 'forgot':var em=(document.getElementById('lEmail').value||'').trim();if(!em){toast('اكتب بريدك الإلكتروني أولاً');return}fb.auth.sendPasswordResetEmail(auth,em).then(function(){toast('أرسلنا رابط تغيير كلمة السر إلى بريدك',4000)},function(){toast('تعذّر الإرسال. تأكد من البريد.')});return;
  }
@@ -1108,7 +1132,7 @@ loadCart();render();
 Promise.all([import(G+'firebase-app.js'),import(G+'firebase-firestore.js'),import(G+'firebase-auth.js')]).then(function(m){
  fb={app:m[0],fs:m[1],auth:m[2]};
  var fa=m[0].initializeApp(CFG);fbApp=fa;try{db=m[1].initializeFirestore(fa,{localCache:m[1].persistentLocalCache({tabManager:m[1].persistentMultipleTabManager()})})}catch(e){console.warn(e);db=m[1].getFirestore(fa)}auth=m[2].getAuth(fa);
- subProducts();fixCart();
+ subProducts();fixCart();watchSite();
  if(storeMode)watchPrep();
  m[2].onAuthStateChanged(auth,function(u){user=u;if(u&&isAdminUrl){watchOrders();watchPrepAll();watchImgs()}else{if(unsubImgs){unsubImgs();unsubImgs=null}if(unsubOrders){unsubOrders();unsubOrders=null}orders=[];seenNew=null}render()});
  render();
@@ -1119,9 +1143,10 @@ Promise.all([import(G+'firebase-app.js'),import(G+'firebase-firestore.js'),impor
 
 <div id="installTip" hidden role="dialog" aria-label="تثبيت التطبيق">
 <button type="button" class="it-x" aria-label="إغلاق">×</button>
-<div class="it-row"><img class="it-ic" alt="" src=""><div><b>ثبّت تطبيق الوفاء المتميز على هاتفك</b><span>لتفتح الطلبيات بضغطة واحدة من الشاشة الرئيسية</span></div></div>
+<div class="it-row"><img class="it-ic" alt="" src=""><div><b>ثبّت تطبيق الوفاء المتميز على هاتفك</b><span>لتفتح الطلبيات بضغطة واحدة من الشاشة الرئيسية — اتبع الخطوات:</span></div></div>
 <button type="button" class="it-go" hidden>📲 تثبيت التطبيق الآن</button>
 <ol class="it-steps"></ol>
+<button type="button" class="it-done">✅ أضفته للشاشة — لا تُظهر هذه الرسالة مرة أخرى</button>
 </div>
 <style>
 .pv .add,.pv .qty{display:none}
@@ -1159,6 +1184,7 @@ Promise.all([import(G+'firebase-app.js'),import(G+'firebase-firestore.js'),impor
 #installTip span{display:block;font-size:12.5px;color:var(--muted,#6f5a78)}
 #installTip .it-go{display:block;width:100%;margin:10px 0 2px;border:0;border-radius:10px;background:var(--accent,#b4245f);color:#fff;font-weight:700;font-size:16px;padding:12px;cursor:pointer;font-family:inherit}
 #installTip .it-go[hidden]{display:none}
+#installTip .it-done{display:block;width:100%;margin:8px 0 0;border:1px solid var(--line,#ead4de);border-radius:10px;background:var(--soft,#f6dde8);color:var(--ink,#2e1838);font:inherit;font-size:13px;font-weight:700;padding:9px}
 #installTip .it-steps{margin:10px 0 0;padding:0 20px 0 0;font-size:14px;line-height:1.9}
 #installTip .it-steps em{font-style:normal;font-weight:700;color:var(--accent,#b4245f)}
 #installTip .it-x{position:absolute;top:6px;left:8px;width:32px;height:32px;border:0;background:var(--soft,#f6dde8);color:var(--ink,#2e1838);border-radius:50%;font-size:20px;line-height:1;cursor:pointer}
@@ -1168,15 +1194,18 @@ Promise.all([import(G+'firebase-app.js'),import(G+'firebase-firestore.js'),impor
  var KEY='installTipClosed',tip=document.getElementById('installTip');
  if(!tip)return;
  var go=tip.querySelector('.it-go'),ev=null;
- window.addEventListener('beforeinstallprompt',function(e){e.preventDefault();ev=e;go.hidden=false;tip.querySelector('.it-steps').hidden=true;if(!/^#(admin|store)/i.test(location.hash))tip.hidden=false});
+ /* على أندرويد لا نستخدم زر «تثبيت» لأن حماية جوجل (Play Protect) تُظهر تحذيراً — نشرح للزبون طريقة «إنشاء اختصار» بدلاً منه */
+ window.addEventListener('beforeinstallprompt',function(e){e.preventDefault()});
  go.onclick=function(){if(!ev)return;ev.prompt();ev.userChoice.then(function(r){ev=null;go.hidden=true;if(r&&r.outcome==='accepted'){tip.hidden=true;try{localStorage.setItem(KEY,'1')}catch(e){}}else tip.querySelector('.it-steps').hidden=false})};
  window.addEventListener('appinstalled',function(){tip.hidden=true;try{localStorage.setItem(KEY,'1')}catch(e){}});
  var ua=navigator.userAgent||'',
   ios=/iPhone|iPad|iPod/.test(ua)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1),
   android=/Android/i.test(ua),
   standalone=window.navigator.standalone===true||(window.matchMedia&&matchMedia('(display-mode: standalone)').matches);
- function closed(){try{return localStorage.getItem(KEY)==='1'}catch(e){return false}}
- if(standalone||(!ios&&!android)||closed())return;
+ /* الإغلاق بـ × يخفي الرسالة لهذه الزيارة فقط — تعود في كل مرة يفتح فيها الزبون الرابط حتى يضيفها للشاشة */
+ function closed(){try{return localStorage.getItem(KEY)==='1'||sessionStorage.getItem(KEY)==='1'}catch(e){return false}}
+ if(standalone){try{localStorage.setItem(KEY,'1')}catch(e){}return}
+ if((!ios&&!android)||closed())return;
  var ic=document.querySelector('link[rel="apple-touch-icon"]');
  if(ic)tip.querySelector('.it-ic').src=ic.href;
  var inApp=/FBAN|FBAV|Instagram|WhatsApp|Line\//i.test(ua)||(ios&&!/Safari/i.test(ua));
@@ -1188,13 +1217,15 @@ Promise.all([import(G+'firebase-app.js'),import(G+'firebase-firestore.js'),impor
  ]:[
   inApp?'اضغط زر الخيارات ثم اختر <em>فتح في Chrome</em>':'',
   'اضغط زر القائمة <em>⋮</em> أعلى الشاشة',
-  'اختر <em>إضافة إلى الشاشة الرئيسية</em> أو <em>تثبيت التطبيق</em>',
+  'اختر <em>إضافة إلى الشاشة الرئيسية</em>',
+  'إذا ظهر لك خياران اختر <em>إنشاء اختصار</em> (وليس «تثبيت»)',
   'اضغط <em>إضافة</em> — وسيظهر شعار الشركة على شاشتك'
  ];
  tip.querySelector('.it-steps').innerHTML=steps.filter(Boolean).map(function(s){return '<li>'+s+'</li>'}).join('');
  function isAdmin(){return /^#(admin|store)/i.test(location.hash)}
  function sync(){tip.hidden=isAdmin()||closed()}
- tip.querySelector('.it-x').onclick=function(){try{localStorage.setItem(KEY,'1')}catch(e){}tip.hidden=true};
+ tip.querySelector('.it-x').onclick=function(){try{sessionStorage.setItem(KEY,'1')}catch(e){}tip.hidden=true};
+ tip.querySelector('.it-done').onclick=function(){try{localStorage.setItem(KEY,'1')}catch(e){}tip.hidden=true};
  window.addEventListener('hashchange',sync);
  setTimeout(sync,1500);
 })();
