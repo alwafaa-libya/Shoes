@@ -47,7 +47,17 @@ service cloud.firestore {
             && bsKeysOk()
             && bsNew().diff(bsOld()).affectedKeys().hasOnly([myKey()])
             && bsNew().get(myKey(), 0) is int
-            && bsNew().get(myKey(), 0) >= 0);
+            && bsNew().get(myKey(), 0) >= 0)
+        // مسؤول الفرع يصحّح فاتورة واصلة: يرجع كمية من رصيد فرعه إلى المخزن الرئيسي (بنفس العدد)
+        || (isBranch()
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['stock','bs'])
+            && request.resource.data.stock is int
+            && request.resource.data.stock >= 0
+            && bsKeysOk()
+            && bsNew().diff(bsOld()).affectedKeys().hasOnly([myKey()])
+            && bsNew().get(myKey(), 0) is int
+            && bsNew().get(myKey(), 0) >= 0
+            && request.resource.data.stock - resource.data.stock == bsOld().get(myKey(), 0) - bsNew().get(myKey(), 0));
     }
 
     match /imgs/{id} {
@@ -69,7 +79,14 @@ service cloud.firestore {
                         && request.resource.data.lines.size() > 0);
       allow read: if isOwner()
                   || (isBranch() && resource.data.branchBy == request.auth.token.email.lower());
-      allow update, delete: if isOwner();
+      allow update: if isOwner()
+                    || (isBranch()
+                        && resource.data.branchBy == request.auth.token.email.lower()
+                        && resource.data.status == 'accepted'
+                        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['lines','totals','editedAt','edits'])
+                        && request.resource.data.lines is list
+                        && request.resource.data.lines.size() > 0);
+      allow delete: if isOwner();
     }
 
     // كلمات مرور الفروع: يراها المالك فقط، وكل فرع يحدّث كلمته فقط
