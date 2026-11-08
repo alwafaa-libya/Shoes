@@ -621,6 +621,15 @@ function openManual(){if(!man)manNew();var B=manBr(),isB=role()==='branch';if(is
 }
 function ctrChips(){var A=D.products.filter(function(p){return p.stock>0&&!(p.pend&&role()==='branch')}),M={},none=0;A.forEach(function(p){var c=String(p.ctr||'').trim();if(c)M[c]=(M[c]||0)+1;else none++});var K=Object.keys(M).sort(function(a,b){return a.localeCompare(b,'ar')});if(!K.length)return '';var cur=man.ctr||'';
  return '<div class="mctr"><span>🏷️ التصنيف:</span>'+[['','الكل',A.length]].concat(K.map(function(k){return [k,k,M[k]]})).concat(none?[['-','بدون تصنيف',none]]:[]).map(function(c){return '<button class="chip'+(cur===c[0]?' on':'')+'" data-mctr="'+esc(c[0])+'" type="button">'+esc(c[1])+' <small class="num">'+c[2]+'</small></button>'}).join('')+'</div>'}
+function viewName(){var c=admCat;if(String(c).indexOf('ctr:')===0)return 'حاوية '+c.slice(4);if(c==='noctr')return 'بدون تصنيف';if(c==='all'||c==='auto')return 'الكل';if(c==='pend')return 'الدفعة الجديدة';if(c==='hidden')return 'المخفية';if(c==='none')return 'بدون قسم';if(c==='plastic')return 'البلاستيك';return catName(c)||c}
+function xlView(){var L=D.products.filter(function(p){return inCat(p,admCat)}).slice().sort(function(a,b){return String(a.code).localeCompare(String(b.code))});if(!L.length){toast('لا توجد أصناف في هذا العرض');return}
+ xlsx().then(function(X){var B=LOCS.slice(1),head=['ت','رقم الصنف','اسم الصنف','المقاسات','عبوة الكرتونة','سعر القطعة','القسم','الحاوية','المخزن الرئيسي'].concat(B.map(function(b){return b[1]})).concat(['الإجمالي (كراتين)','الحالة','ظاهر للزبائن']);
+  var rows=[head],tot=0;L.forEach(function(p,i){var br=B.map(function(b){return bq(p,b[0])}),all=(p.stock||0)+br.reduce(function(a,b){return a+b},0);tot+=all;
+   rows.push([i+1,p.code,p.name||'',p.sizes||'',p.pack||'',p.price||0,catName(p.cat)||'',p.ctr||'',p.stock||0].concat(br).concat([all,all>0?'متوفر':'نفد (كامل)',p.hidden?'لا':'نعم']))});
+  rows.push([]);rows.push(['','المجموع','','','','','','','']. concat(B.map(function(){return ''})).concat([tot]));
+  var ws=X.utils.aoa_to_sheet(rows);ws['!cols']=head.map(function(h,i){return {wch:i===1?16:i===2?20:10}});ws['!views']=[{RTL:true}];
+  var wb=X.utils.book_new();wb.Workbook={Views:[{RTL:true}]};X.utils.book_append_sheet(wb,ws,'الأصناف');X.writeFile(wb,'أصناف-'+viewName().replace(/[\\/:*?"<>|]/g,'-')+'-'+today().replace(/\//g,'-')+'.xlsx');
+  toast('📥 تم تنزيل شيت '+L.length+' صنف — '+viewName(),4000)},function(){toast('تعذّر تحميل أداة الإكسل. تأكد من الإنترنت.')})}
 function ctrTabs(){var M={},none=0,L=D.products.filter(function(p){return !p.pend});L.forEach(function(p){var c=String(p.ctr||'').trim();if(c)M[c]=(M[c]||0)+1;else none++});var K=Object.keys(M).sort(function(a,b){return a.localeCompare(b,'ar')});if(!K.length&&!none)return '';
  return '<div class="mctr" style="margin-top:8px"><span>🏷️ التصنيف:</span>'+K.map(function(k){return ['ctr:'+k,k,M[k]]}).concat(none?[['noctr','⚠️ بدون تصنيف',none]]:[]).map(function(c){return '<button class="chip'+(admCat===c[0]?' on':'')+'" data-admcat="'+esc(c[0])+'" type="button">'+esc(c[1])+' <small class="num">'+c[2]+'</small></button>'}).join('')+'</div>'}
 function manDraw(){manDrawLines();manDrawRes()}
@@ -835,7 +844,7 @@ function renderAdmin(){
   var acn=catCounts(D.products);if(admCat==='auto'&&D.fromDb&&D.products.length)admCat=acn.pend?'pend':acn.none?'none':'all';if(admCat==='pend'&&!acn.pend)admCat=acn.none?'none':'all';if(admCat==='none'&&!acn.none)admCat='all';if(admCat==='hidden'&&!acn.hidden)admCat='all';
   if(acn.pend){var PL=D.products.filter(function(p){return p.pend}),pNo=PL.filter(function(p){return !(p.images&&p.images.length)}).length,pOr=PL.filter(function(p){return p.code==='صنف جديد'}).length;
    h+='<div class="pendbox"><div><b>📥 دفعة جديدة قيد المراجعة: <span class="num">'+acn.pend+'</span> صنف</b><span>هذه الأصناف منفصلة عن أصنافك السابقة ولا تظهر للزبائن حتى تعتمدها. راجعها واربط الصور، ثم اضغط «اعتماد». بعد الاعتماد تنضم للأصناف وتصنّف كل صنف في قسمه.</span>'+(pNo||pOr?'<span class="pw">'+(pNo?'⚠️ '+pNo+' صنف بدون صورة. ':'')+(pOr?'⚠️ '+pOr+' صورة غير مربوطة بصنف.':'')+'</span>':'<span class="pk">✅ كل الأصناف فيها صور</span>')+'</div><div class="xbtns">'+(admCat!=='pend'?'<button class="btn ghost" data-admcat="pend" type="button">عرض الدفعة</button>':'')+'<button class="scan" id="approve" type="button">✅ اعتماد الدفعة</button></div></div>'}
-  h+='<div class="grid"><div class="catset" style="display:block"><b>📂 الأقسام</b>'+(acn.none?' <span style="color:var(--warn);font-weight:700;display:inline">— '+acn.none+' صنف بدون قسم لا يظهر للزبائن</span>':'')+catTabs(admCat,'admcat',acn).replace('margin:0 0 16px','')+ctrTabs()+'</div>';
+  h+='<div class="grid"><div class="catset" style="display:block"><b>📂 الأقسام</b>'+(acn.none?' <span style="color:var(--warn);font-weight:700;display:inline">— '+acn.none+' صنف بدون قسم لا يظهر للزبائن</span>':'')+catTabs(admCat,'admcat',acn).replace('margin:0 0 16px','')+ctrTabs()+'<button class="btn ghost" id="xlView" type="button" style="margin-top:8px">📥 تنزيل شيت إكسل لأصناف '+esc(viewName())+'</button></div>';
   var AL=D.products.filter(function(p){return inCat(p,admCat)&&(!chkOnly||p._dirty||(chk[p.id]&&chk[p.id].s!=='ok'))});
   if(AL.length&&D.fromDb)h+='<div class="catset"><span>نقل كل الأصناف المعروضة الآن ('+AL.length+' صنف) إلى قسم واحد دفعة واحدة:</span><select id="bulkCat"><option value="">— اختر القسم —</option>'+catOpts('')+'</select><button class="btn acc" id="bulkGo" type="button">تطبيق</button><span>أو إخفاء / إظهار كل هذه الأصناف للزبائن:</span><button class="btn ghost" id="bulkHide" type="button">🚫 إخفاء الكل</button><button class="btn ghost" id="bulkShow" type="button">👁️ إظهار الكل</button></div>';
   h+=AL.map(editCard).join('')+'<button class="newcard" id="addProd" type="button">+ صنف جديد'+(catName(admCat)?' في قسم '+catName(admCat):'')+'</button></div>';
@@ -1174,6 +1183,7 @@ document.addEventListener('click',function(e){
  if(t.id==='pwOpen'){sheet('pwS','تغيير كلمة المرور','<div class="shd"><h2></h2><button class="x" data-close="1" type="button" aria-label="إغلاق">✕</button></div>'+pwForm(false));return}
  if(t.id==='mkBr'){mkBranches(t);return}
  if(ds.pwed){pwEdit(ds.pwed);return}
+ if(t.id==='xlView'){xlView();return}
  if(t.id==='pwReset'){pwSet(t.dataset.em,INIT_PW,t);return}
  if(ds.bssave){saveBs(ds.bssave,t);return}
  if(ds.zoom){openZoom(find(ds.zoom));return}
