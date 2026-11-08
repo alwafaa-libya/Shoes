@@ -13,15 +13,41 @@ service cloud.firestore {
       ];
     }
 
+    // مفتاح رصيد كل فرع: tr طرابلس، bn بنغازي، ms مصراتة، aj اجدابيا، by البيضاء، tb طبرق، mr المعرض
+    function myKey() {
+      return {'tripoli@alwafaa.ly':'tr','misrata@alwafaa.ly':'ms','ajdabiya@alwafaa.ly':'aj',
+              'benghazi@alwafaa.ly':'bn','bayda@alwafaa.ly':'by','tobruk@alwafaa.ly':'tb','maarad@alwafaa.ly':'mr'}
+             .get(request.auth.token.email.lower(), '');
+    }
+    function bsOld() { return resource.data.get('bs', {}); }
+    function bsNew() { return request.resource.data.get('bs', {}); }
+    function bsKeysOk() { return bsNew().keys().hasOnly(['tr','bn','ms','aj','by','tb','mr']); }
+    function dec(k) {
+      return bsNew().get(k, 0) is int && bsNew().get(k, 0) >= 0 && bsNew().get(k, 0) <= bsOld().get(k, 0);
+    }
+
     match /products/{id} {
       allow read: if true;
       allow create, delete: if isOwner();
-      allow update: if isOwner() || (
-        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['stock']) &&
-        request.resource.data.stock is int &&
-        request.resource.data.stock >= 0 &&
-        request.resource.data.stock < resource.data.stock
-      );
+      allow update: if isOwner()
+        // زبون يطلب من المخزن الرئيسي: الكمية تنقص فقط
+        || (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['stock'])
+            && request.resource.data.stock is int
+            && request.resource.data.stock >= 0
+            && request.resource.data.stock < resource.data.stock)
+        // زبون يطلب من فرع: رصيد الفرع ينقص فقط
+        || (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['bs'])
+            && bsKeysOk() && dec('tr') && dec('bn') && dec('ms') && dec('aj') && dec('by') && dec('tb') && dec('mr'))
+        // مسؤول الفرع: ينقل من الرئيسي إلى رصيد فرعه، أو يعدّل رصيد فرعه فقط
+        || (isBranch()
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['stock','bs'])
+            && request.resource.data.stock is int
+            && request.resource.data.stock >= 0
+            && request.resource.data.stock <= resource.data.stock
+            && bsKeysOk()
+            && bsNew().diff(bsOld()).affectedKeys().hasOnly([myKey()])
+            && bsNew().get(myKey(), 0) is int
+            && bsNew().get(myKey(), 0) >= 0);
     }
 
     match /imgs/{id} {
