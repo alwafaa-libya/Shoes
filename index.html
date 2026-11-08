@@ -326,7 +326,9 @@ var custLoc='',locSet=false;try{var lv=localStorage.getItem('wf_loc');if(lv!==nu
 function av(p){return bq(p,custLoc)}
 function locUpd(k,v){var u={};if(k)u['bs.'+k]=Math.max(0,v);else u.stock=Math.max(0,v);return u}
 function locDiv(o){return o&&o.locName?'<div><span>الفرع</span><b>'+esc(o.locName)+'</b></div>':''}
-function setLoc(k){custLoc=k;locSet=true;try{localStorage.setItem('wf_loc',k)}catch(er){}curInv=null;return fixCart()}
+var BRI={},briAsked={};
+function loadBri(k){if(!k||briAsked[k]||!fb||!db)return;briAsked[k]=1;fb.fs.getDoc(fb.fs.doc(db,'brinfo',k)).then(function(d){if(d.exists()){BRI[k]=d.data();if(isAdminUrl&&!editing()&&!document.querySelector('.sheet'))render()}},function(e){console.warn('brinfo',e)})}
+function setLoc(k){custLoc=k;locSet=true;loadBri(k);try{localStorage.setItem('wf_loc',k)}catch(er){}curInv=null;return fixCart()}
 function locPick(){return '<h2 class="brand" style="font-size:1.3rem;text-align:center;margin:10px 0 2px">📍 اختر الفرع الذي تريد الشراء منه</h2><p class="note" style="text-align:center">تظهر لك البضاعة المتوفرة في الفرع الذي تختاره. يمكنك تغييره لاحقاً من أعلى الصفحة.</p><div class="cpick lpick">'+LOCS.map(function(x){return '<button type="button" data-loc="'+x[0]+'"><span>'+(x[0]?'🏬':'🏢')+'</span>'+x[1]+'</button>'}).join('')+'</div>'}
 function locBar(){return '<div class="locbar'+(locSet?'':' need')+'"><b>📍 الفرع</b><select id="locSel" aria-label="اختر الفرع">'+(locSet?'':'<option value="" disabled selected>— اختر الفرع أولاً —</option>')+LOCS.map(function(x){return '<option value="'+x[0]+'"'+(locSet&&custLoc===x[0]?' selected':'')+'>'+x[1]+'</option>'}).join('')+'</select></div>'}
 function toast(t,ms){var el=document.createElement('div');el.className='toast';el.textContent=t;document.body.appendChild(el);setTimeout(function(){el.remove()},ms||2800)}
@@ -358,6 +360,7 @@ function render(){
  h+='<button class="cartbtn" id="openCart" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 4h2l2.4 11.2a1.5 1.5 0 0 0 1.5 1.2h8.6a1.5 1.5 0 0 0 1.5-1.2L21 8H6.2"/><circle cx="9.5" cy="20" r="1.3"/><circle cx="17" cy="20" r="1.3"/></svg>السلة<span class="bdg num">'+cartCount()+'</span></button>';
  h+='</header>';
  if(SITE.closed)h+='<p class="note live" style="background:#fdecea;color:#b3261e;font-weight:700">🔒 الموقع مغلق الآن للزبائن (وضع التطوير). أنت تراه لأنك المدير.</p>';
+ if(locSet&&custLoc)loadBri(custLoc);
  if(!locSet){h+=locPick()+'<p class="pfoot">للاستفسار واتساب: <span class="num">+'+waOf(D.phone)+'</span></p></div>';app.innerHTML=h;return}
  h+=locBar();
  h+=newsBar();
@@ -529,8 +532,9 @@ function sendOrder(){
    tx.set(F.doc(F.collection(db,'orders')),{no:no,date:today(),loc:LK,locName:locName(LK),status:'new',createdAt:F.serverTimestamp(),customer:{name:cust.name,city:cust.city,tel:cust.tel,note:cust.note},lines:L,totals:T});
   });
  }).then(function(){
-  busy=false;cart={};saveCart();curInv=null;render();notifyOwner(lastOrder);
-  sheet('okS','تم إرسال الطلب','<div class="okbox"><div class="okic">✓</div><h2>تم إرسال طلبك بنجاح</h2><p class="note">سيصلك رد بقبول الطلب على الواتساب على الرقم <span class="num">'+esc(cust.tel)+'</span> قريباً.</p></div>'+
+  busy=false;cart={};saveCart();curInv=null;render();if(!LK)notifyOwner(lastOrder);var bt=LK&&BRI[LK]&&BRI[LK].tel;
+  sheet('okS','تم إرسال الطلب','<div class="okbox"><div class="okic">✓</div><h2>تم إرسال طلبك بنجاح</h2><p class="note">'+(LK?'وصل طلبك إلى <b>فرع '+esc(locName(LK))+'</b>. ':'')+'سيصلك رد بقبول الطلب على الواتساب على الرقم <span class="num">'+esc(cust.tel)+'</span> قريباً.</p></div>'+
+  (bt?'<a class="wa" href="https://wa.me/'+waOf(bt)+'?text='+encodeURIComponent(orderText(lastOrder))+'" target="_blank" rel="noopener" style="margin:8px 0">📤 أرسل الفاتورة لفرع '+esc(locName(LK))+' على واتساب</a>':'')+
   '<p class="note" style="text-align:center;margin:10px 0 0"><b>هذه نسختك من الفاتورة:</b></p>'+paperHtml(lastOrder)+
   '<div class="acts"><button class="btn acc lg" id="saveInv" type="button">📥 حفظ صورة الفاتورة</button><a class="wa" id="selfWa" href="https://wa.me/'+waOf(cust.tel)+'?text='+encodeURIComponent(orderText(lastOrder))+'" target="_blank" rel="noopener">إرسال نسخة إلى واتسابي</a><button class="btn ghost" data-close="1" type="button">تم</button></div>');
  },function(e){
@@ -550,19 +554,39 @@ function role(){var e=uEmail();if(!e)return '';if(e===OWNER_EMAIL)return 'owner'
 function myBranch(){return BR_USERS[uEmail()]||''}
 var brOrders=[],unsubBr=null,brErr='';
 function watchBranch(){if(unsubBr||!fb||!db||role()!=='branch')return;var F=fb.fs;
+ watchBrSales();var K0=brKeyOf(myBranch());if(K0)fb.fs.getDoc(fb.fs.doc(db,'brinfo',K0)).then(function(d){if(d.exists()){BRI[K0]=d.data();render()}},function(){});
  unsubBr=F.onSnapshot(F.query(F.collection(db,'orders'),F.where('branchBy','==',uEmail())),function(s){brOrders=s.docs.map(function(d){var x=d.data();x.id=d.id;return x}).sort(function(a,b){return ((b.createdAt&&b.createdAt.seconds)||9e9)-((a.createdAt&&a.createdAt.seconds)||9e9)});brErr='';render()},function(e){console.error(e);brErr=e.code==='permission-denied'?'perm':'err';render()})}
-function stopBranch(){if(unsubBr){unsubBr();unsubBr=null}brOrders=[]}
+function stopBranch(){if(unsubBr){unsubBr();unsubBr=null}if(unsubBrS){unsubBrS();unsubBrS=null}brOrders=[];brSales=[];brSeen=null}
+var brSales=[],unsubBrS=null,brSeen=null,brSErr='',brTab='new';
+function watchBrSales(){var K=brKeyOf(myBranch());if(unsubBrS||!K||!fb)return;var F=fb.fs;
+ unsubBrS=F.onSnapshot(F.query(F.collection(db,'orders'),F.where('loc','==',K)),function(s){brSales=s.docs.map(function(d){var x=d.data();x.id=d.id;return x}).sort(function(a,b){return ((b.createdAt&&b.createdAt.seconds)||9e9)-((a.createdAt&&a.createdAt.seconds)||9e9)});brSErr='';
+  var n=brSales.filter(function(o){return o.status==='new'}).length;if(brSeen!==null&&n>brSeen)newOrderAlert(brSales.filter(function(o){return o.status==='new'})[0]);brSeen=n;document.title=(n?'('+n+') ':'')+'بوابة الفروع';if(!editing()&&!document.querySelector('.sheet'))render()},
+ function(e){console.error(e);brSErr=e.code==='permission-denied'?'perm':'err';render()})}
+function brSaleCard(o){var c=o.customer||{},T=o.totals||{};return '<article class="ocard'+(o.status==='new'?' isnew':'')+'"><div class="ohd"><div><b class="num">'+esc(o.no||'')+'</b> '+stLabel(o.status)+'</div><small class="num">'+fmtTime(o.createdAt)+'</small></div>'+
+ '<div class="pcust"><div><span>الزبون</span><b>'+esc(c.name||'—')+'</b></div><div><span>المدينة</span><b>'+esc(c.city||'—')+'</b></div><div><span>الهاتف</span><b class="num">'+esc(c.tel||'—')+'</b></div>'+(c.note?'<div class="wide"><span>ملاحظات</span><b>'+esc(c.note)+'</b></div>':'')+'</div>'+invTable(o.lines||[])+
+ '<div class="grandl"><span>المبلغ</span><b><span class="num">'+money(T.t)+'</span> د.ل · '+(T.c||0)+' كرتونة</b></div>'+
+ (o.status==='new'?'<div class="two-b"><button class="btn acc" data-bacc="'+o.id+'" type="button">قبول وإرسال رد للزبون</button><button class="btn ghost" data-brej="'+o.id+'" type="button">رفض وإرجاع الكمية</button></div>':(c.tel?'<div class="two-b"><a class="wa2" href="'+waLink(o,o.status==='accepted')+'" target="_blank" rel="noopener">مراسلة الزبون على الواتساب</a></div>':''))+'</article>'}
+function brAccept(id){var o=brSales.filter(function(x){return x.id===id})[0];if(!o)return;var w=window.open(waLink(o,true),'_blank');
+ fb.fs.updateDoc(fb.fs.doc(db,'orders',id),{status:'accepted',doneAt:fb.fs.serverTimestamp(),by:uEmail()}).catch(function(e){console.error(e);toast(permMsg(e))});if(!w)location.href=waLink(o,true)}
+function brReject(id){var o=brSales.filter(function(x){return x.id===id})[0];if(!o)return;var F=fb.fs,K=o.loc;
+ F.runTransaction(db,function(tx){var L=o.lines||[],refs=L.map(function(l){return F.doc(db,'products',l.id||'x')}),oref=F.doc(db,'orders',id);
+  return Promise.all([tx.get(oref)].concat(refs.map(function(r){return tx.get(r)}))).then(function(S){if(S[0].data().status!=='new')return;
+   S.slice(1).forEach(function(ps,i){if(ps.exists()){var u={};u['bs.'+K]=bq(ps.data(),K)+(L[i].q||0);tx.update(refs[i],u)}});tx.update(oref,{status:'rejected',doneAt:F.serverTimestamp(),by:uEmail()})})})
+ .then(function(){toast('تم رفض الطلب وإرجاع الكمية لرصيد الفرع');window.open(waLink(o,false),'_blank')},function(e){console.error(e);toast(permMsg(e))})}
+function brTelBox(){var K=brKeyOf(myBranch()),t=(BRI[K]||{}).tel||'';return '<div class="storeset"><label>📞 رقم واتساب الفرع (تصله فواتير زبائن فرعكم)<input id="brTel" type="tel" inputmode="tel" dir="ltr" placeholder="09xxxxxxxx" value="'+esc(t)+'"></label><button class="btn acc" id="brTelSave" type="button">حفظ الرقم</button>'+(t?'':'<small style="color:var(--warn)">⚠️ لم يُسجَّل رقم بعد: الزبون لن يجد زر إرسال الفاتورة لفرعكم.</small>')+'</div>'}
+function brTelSave(v){var K=brKeyOf(myBranch()),n=digits(v);if(waOf(n).length<9){toast('اكتب رقم واتساب صحيح');return Promise.reject()}
+ return fb.fs.setDoc(fb.fs.doc(db,'brinfo',K),{tel:v.trim(),name:myBranch(),at:fb.fs.serverTimestamp()}).then(function(){BRI[K]={tel:v.trim()};toast('✅ تم حفظ رقم الفرع')},function(e){console.error(e);toast(permMsg(e));throw e})}
 var INIT_PW='246810',PWS={},unsubPw=null;
 function mustPw(){try{return sessionStorage.getItem('wf_mc')==='1'}catch(e){return false}}
 function pwForm(first){return '<form class="login" id="pwF" style="margin:0 auto"><h2>🔑 '+(first?'غيّر كلمة المرور أولاً':'تغيير كلمة المرور')+'</h2>'+(first?'<p class="note">هذا أول دخول بكلمة المرور الأولية. اختر كلمة مرور جديدة خاصة بفرعكم (6 أرقام أو حروف على الأقل).</p>':'')+
- '<label class="f">كلمة المرور الجديدة<input id="pw1" type="text" inputmode="numeric" dir="ltr" autocomplete="new-password"></label><label class="f">أعد كتابتها<input id="pw2" type="text" inputmode="numeric" dir="ltr" autocomplete="new-password"></label><p class="err" id="pwErr" hidden></p><button class="btn acc lg" type="submit">حفظ كلمة المرور</button></form>'}
+ (first&&brKeyOf(myBranch())?'<label class="f">📞 رقم واتساب الفرع<input id="pwTel" type="tel" inputmode="tel" dir="ltr" placeholder="09xxxxxxxx"></label>':'')+'<label class="f">كلمة المرور الجديدة<input id="pw1" type="text" inputmode="numeric" dir="ltr" autocomplete="new-password"></label><label class="f">أعد كتابتها<input id="pw2" type="text" inputmode="numeric" dir="ltr" autocomplete="new-password"></label><p class="err" id="pwErr" hidden></p><button class="btn acc lg" type="submit">حفظ كلمة المرور</button></form>'}
 function pwSave(){var a=document.getElementById('pw1').value.trim(),b=document.getElementById('pw2').value.trim(),er=document.getElementById('pwErr'),E=function(t){er.hidden=false;er.textContent=t};
- if(a.length<6)return E('كلمة المرور يجب أن تكون 6 أرقام أو حروف على الأقل.');if(a===INIT_PW)return E('اختر كلمة مرور غير الأولية 246810.');if(a!==b)return E('الكلمتان غير متطابقتين.');
+ if(a.length<6)return E('كلمة المرور يجب أن تكون 6 أرقام أو حروف على الأقل.');if(a===INIT_PW)return E('اختر كلمة مرور غير الأولية 246810.');if(a!==b)return E('الكلمتان غير متطابقتين.');var tf=document.getElementById('pwTel');if(tf&&waOf(digits(tf.value)).length<9)return E('اكتب رقم واتساب الفرع.');
  var bt=document.querySelector('#pwF button[type=submit]');bt.disabled=true;bt.textContent='جارٍ الحفظ…';
- fb.auth.updatePassword(user,a).then(function(){return fb.fs.setDoc(fb.fs.doc(db,'brpw',uEmail()),{pw:a,branch:myBranch(),at:fb.fs.serverTimestamp()}).catch(function(e){console.warn(e)})}).then(function(){try{sessionStorage.removeItem('wf_mc')}catch(x){}closeSheets();render();toast('✅ تم تغيير كلمة المرور. استعملها في الدخول القادم.',5000)},
+ fb.auth.updatePassword(user,a).then(function(){var tf=document.getElementById('pwTel');return tf?brTelSave(tf.value).catch(function(){}):null}).then(function(){return fb.fs.setDoc(fb.fs.doc(db,'brpw',uEmail()),{pw:a,branch:myBranch(),at:fb.fs.serverTimestamp()}).catch(function(e){console.warn(e)})}).then(function(){try{sessionStorage.removeItem('wf_mc')}catch(x){}closeSheets();render();toast('✅ تم تغيير كلمة المرور. استعملها في الدخول القادم.',5000)},
  function(e){console.error(e);bt.disabled=false;bt.textContent='حفظ كلمة المرور';E(e&&e.code==='auth/requires-recent-login'?'لأمانك: سجّل الخروج ثم ادخل مرة أخرى، وبعدها غيّر كلمة المرور مباشرة.':e&&e.code==='auth/weak-password'?'كلمة المرور ضعيفة. اختر 6 أرقام أو حروف على الأقل.':'تعذّر الحفظ. تأكد من الإنترنت. ('+(e&&e.code||'')+')')})}
 function watchPw(){if(unsubPw||!fb||role()!=='owner')return;var F=fb.fs;unsubPw=F.onSnapshot(F.collection(db,'brpw'),function(s){PWS={};s.docs.forEach(function(d){PWS[d.id]=d.data()});if(!editing())render()},function(e){console.warn('brpw',e);PWS._err=e.code||'err'})}
-function pwBox(){var rows=Object.keys(BR_USERS).map(function(e){var x=PWS[e];return '<tr><td>🏬 '+esc(BR_USERS[e])+'</td><td class="c num" dir="ltr"><b>'+(x&&x.pw?esc(x.pw):'—')+'</b></td><td class="c">'+(x&&x.pw?(x.pw===INIT_PW?'<small style="color:var(--warn)">الأولية — لم يغيّرها</small>':'<small style="color:var(--ok)">غيّرها الفرع ✓</small>'):'<small>لم يُنشأ بعد</small>')+'</td><td class="c">'+(x&&x.pw?'<button class="btn ghost" data-pwed="'+e+'" type="button">✏️ تغيير</button>':'')+'</td></tr>'}).join('');
+function pwBox(){var rows=Object.keys(BR_USERS).map(function(e){var x=PWS[e],bk=brKeyOf(BR_USERS[e]),bt=(BRI[bk]||{}).tel;if(bk)loadBri(bk);return '<tr><td>🏬 '+esc(BR_USERS[e])+(bt?'<small class="num" dir="ltr" style="display:block">📞 '+esc(bt)+'</small>':'')+'</td><td class="c num" dir="ltr"><b>'+(x&&x.pw?esc(x.pw):'—')+'</b></td><td class="c">'+(x&&x.pw?(x.pw===INIT_PW?'<small style="color:var(--warn)">الأولية — لم يغيّرها</small>':'<small style="color:var(--ok)">غيّرها الفرع ✓</small>'):'<small>لم يُنشأ بعد</small>')+'</td><td class="c">'+(x&&x.pw?'<button class="btn ghost" data-pwed="'+e+'" type="button">✏️ تغيير</button>':'')+'</td></tr>'}).join('');
  return '<details class="storeset pwbox"><summary><b>🔑 حسابات الفروع وكلمات المرور</b></summary>'+(PWS._err?'<p class="err">لا تظهر كلمات المرور: حدّث قواعد الأمان في Firebase.</p>':'')+'<div class="tblw"><table class="itab"><thead><tr><th>الفرع</th><th class="c">كلمة المرور</th><th class="c">الحالة</th><th></th></tr></thead><tbody>'+rows+'</tbody></table></div><button class="btn acc" id="mkBr" type="button">إنشاء حسابات الفروع (كلمة المرور الأولية 246810)</button><small>ينشئ الحسابات غير الموجودة فقط. مسؤول الفرع يدخل من نفس رابط الإدارة: يختار فرعه ويكتب 246810، ثم يُطلب منه تغييرها.</small></details>'}
 function pwEdit(e){sheet('pwE','تغيير كلمة مرور فرع','<div class="shd"><h2>🔑 كلمة مرور فرع '+esc(BR_USERS[e])+'</h2><button class="x" data-close="1" type="button" aria-label="إغلاق">✕</button></div><p class="note">الكلمة الحالية: <b class="num" dir="ltr">'+esc((PWS[e]||{}).pw||'')+'</b></p><form class="login" id="pwEF" data-em="'+e+'" style="margin:0"><label class="f">كلمة المرور الجديدة<input id="pwN" type="text" inputmode="numeric" dir="ltr" autocomplete="off"></label><p class="err" id="pwEErr" hidden></p><button class="btn acc lg" type="submit">حفظ</button><button class="btn ghost" id="pwReset" data-em="'+e+'" type="button">↩️ إرجاعها للأولية 246810 (يُطلب من الفرع تغييرها)</button></form>');setTimeout(function(){var f=document.getElementById('pwN');if(f)f.focus()},60)}
 function pwSet(e,np,btn){var er=document.getElementById('pwEErr'),E=function(t){if(er){er.hidden=false;er.textContent=t}};np=String(np||'').trim();if(np.length<6)return E('6 أرقام أو حروف على الأقل.');var cur=(PWS[e]||{}).pw;if(!cur)return E('الكلمة الحالية غير معروفة لهذا الفرع.');if(cur===np)return E('هذه هي الكلمة الحالية نفسها.');
@@ -573,6 +597,11 @@ function mkBranches(btn){btn.disabled=true;btn.textContent='جارٍ الإنش�
  var made=[],had=[],bad=[];Object.keys(BR_USERS).reduce(function(pr,e){return pr.then(function(){return A.createUserWithEmailAndPassword(a2,e,INIT_PW).then(function(){made.push(BR_USERS[e]);return A.signOut(a2).then(function(){return fb.fs.setDoc(fb.fs.doc(db,'brpw',e),{pw:INIT_PW,branch:BR_USERS[e],at:fb.fs.serverTimestamp()})})},function(x){if(x&&x.code==='auth/email-already-in-use')had.push(BR_USERS[e]);else{console.error(x);bad.push(BR_USERS[e]+' ('+(x&&x.code||'')+')')}})})},Promise.resolve())
  .then(function(){btn.disabled=false;btn.textContent='إنشاء حسابات الفروع (كلمة المرور الأولية 246810)';toast((made.length?'✅ أُنشئ: '+made.join('، '):'لم يُنشأ حساب جديد')+(had.length?' — موجود مسبقاً: '+had.join('، '):'')+(bad.length?' — ⚠️ تعذّر: '+bad.join('، '):''),9000)},function(e){console.error(e);btn.disabled=false;toast(permMsg(e),5000)})}
 function renderBranch(h){var B=myBranch();if(mustPw()){h+=pwForm(true)+'</div>';app.innerHTML=h;return}
+ if(brKeyOf(B)){var nN=brSales.filter(function(o){return o.status==='new'}).length;
+  h+='<h3 class="mh">🛒 طلبات زبائن فرع '+esc(B)+'</h3><div class="tabs">'+[['new','الجديدة'],['accepted','المقبولة'],['rejected','المرفوضة']].map(function(t){var n=brSales.filter(function(o){return (o.status||'new')===t[0]}).length;return '<button class="tab'+(brTab===t[0]?' on':'')+'" data-brtab="'+t[0]+'" type="button">'+t[1]+(n?' <span class="bdg num">'+n+'</span>':'')+'</button>'}).join('')+'</div>';
+  if(brSErr)h+='<p class="err">'+(brSErr==='perm'?'لا تظهر الطلبات: يجب على المدير تحديث قواعد الأمان.':'تعذّر تحميل الطلبات.')+'</p>';
+  var SL=brSales.filter(function(o){return (o.status||'new')===brTab});h+=SL.length?'<div class="olist">'+SL.slice(0,40).map(brSaleCard).join('')+'</div>':'<p class="empty">'+(brTab==='new'?'لا توجد طلبات جديدة 👍':'لا شيء هنا.')+'</p>';
+  h+=brTelBox()}
  h+='<div class="scanbox" style="margin-bottom:14px"><div><b>🏬 فرع '+esc(B)+'</b><span>عند وصول بضاعة للفرع: اضغط الزر، أضف الأصناف والكراتين الواصلة (أو صوّر فاتورة النقل)، ثم احفظ. الكمية تنتقل لرصيد الفرع وتصل للإدارة. وعند البيع من المحل: اضغط «رصيد الفرع» وعدّل الكمية الموجودة فعلاً.</span></div></div>';
  h+='<button class="btn acc manbtn" id="openMan" type="button">📥 إدخال بضاعة واصلة'+(man&&man.ord.length?' <small>(مسودة: '+man.ord.length+' صنف)</small>':'')+'</button>';
  h+='<button class="linkb" id="pwOpen" type="button" style="display:block;margin:0 auto 10px">🔑 تغيير كلمة المرور</button>';
@@ -870,7 +899,7 @@ function renderAdmin(){
 }
 function orderCard(o){
  var c=o.customer||{},T=o.totals||{};
- return '<article class="ocard'+(o.status==='new'?' isnew':'')+'"><div class="ohd"><div><b class="num">'+esc(o.no||'')+'</b> '+stLabel(o.status)+(o.branchBy?' <span class="st man">📥 إدخال فرع '+esc(o.branch||'')+'</span>':o.manual?' <span class="st man">🏬 يدوية</span>':'')+'</div><small class="num">'+fmtTime(o.createdAt)+'</small></div>'+
+ return '<article class="ocard'+(o.status==='new'?' isnew':'')+'"><div class="ohd"><div><b class="num">'+esc(o.no||'')+'</b> '+stLabel(o.status)+(o.branchBy?' <span class="st man">📥 إدخال فرع '+esc(o.branch||'')+'</span>':o.manual?' <span class="st man">🏬 يدوية</span>':o.loc?' <span class="st man">🏬 طلب فرع '+esc(locName(o.loc))+(o.by?' — عالجه الفرع':'')+'</span>':'')+'</div><small class="num">'+fmtTime(o.createdAt)+'</small></div>'+
  '<div class="pcust"><div><span>الزبون</span><b>'+esc(c.name||'—')+'</b></div><div><span>المدينة</span><b>'+esc(c.city||'—')+'</b></div><div><span>الهاتف</span><b class="num">'+esc(c.tel||'—')+'</b></div>'+locDiv(o)+(c.note?'<div class="wide"><span>ملاحظات</span><b>'+esc(c.note)+'</b></div>':'')+'</div>'+
  invTable(o.lines||[])+
  '<div class="grandl"><span>المبلغ</span><b><span class="num">'+money(T.t)+'</span> د.ل · '+(T.c||0)+' كرتونة</b></div>'+
@@ -1158,7 +1187,7 @@ function watchOrders(){
  unsubOrders=F.onSnapshot(F.query(F.collection(db,'orders'),F.orderBy('createdAt','desc'),F.limit(500)),function(s){
   orders=s.docs.map(function(d){var x=d.data();x.id=d.id;return x});ordersErr='';
   var nNew=orders.filter(function(o){return o.status==='new'}).length;
-  if(seenNew!==null&&nNew>seenNew){newOrderAlert(orders.filter(function(o){return o.status==='new'})[0])}
+  if(seenNew!==null&&nNew>seenNew){var no0=orders.filter(function(o){return o.status==='new'})[0];if(!no0||!no0.loc)newOrderAlert(no0)}
   seenNew=nNew;document.title=(nNew?'('+nNew+') ':'')+'لوحة الإدارة';
   if(!editing())render();
  },function(e){console.error(e);ordersErr=e.code==='permission-denied'?'هذا الحساب لا يملك صلاحية رؤية الطلبات. تأكد من قواعد الأمان.':'تعذّر تحميل الطلبات.';render()});
@@ -1199,6 +1228,10 @@ document.addEventListener('click',function(e){
  if(t.id==='pwOpen'){sheet('pwS','تغيير كلمة المرور','<div class="shd"><h2></h2><button class="x" data-close="1" type="button" aria-label="إغلاق">✕</button></div>'+pwForm(false));return}
  if(t.id==='mkBr'){mkBranches(t);return}
  if(ds.pwed){pwEdit(ds.pwed);return}
+ if(ds.brtab){brTab=ds.brtab;render();return}
+ if(ds.bacc){brAccept(ds.bacc);return}
+ if(ds.brej){if(!t.dataset.sure){t.dataset.sure='1';t.textContent='متأكد؟ اضغط مرة ثانية';return}brReject(ds.brej);return}
+ if(t.id==='brTelSave'){var bv=document.getElementById('brTel');if(bv)brTelSave(bv.value).then(function(){render()},function(){});return}
  if(ds.medit){if(man&&man.ord.length&&!man.edit&&!confirmDraft())return;editManual(ds.medit);return}
  if(t.id==='xlView'){xlView();return}
  if(t.id==='pwReset'){pwSet(t.dataset.em,INIT_PW,t);return}

@@ -78,15 +78,29 @@ service cloud.firestore {
                         && request.resource.data.lines is list
                         && request.resource.data.lines.size() > 0);
       allow read: if isOwner()
-                  || (isBranch() && resource.data.branchBy == request.auth.token.email.lower());
+                  || (isBranch() && resource.data.get('branchBy','') == request.auth.token.email.lower())
+                  || (isBranch() && myKey() != '' && resource.data.get('loc','') == myKey());
       allow update: if isOwner()
                     || (isBranch()
-                        && resource.data.branchBy == request.auth.token.email.lower()
+                        && resource.data.get('branchBy','') == request.auth.token.email.lower()
                         && resource.data.status == 'accepted'
                         && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['lines','totals','editedAt','edits'])
                         && request.resource.data.lines is list
-                        && request.resource.data.lines.size() > 0);
+                        && request.resource.data.lines.size() > 0)
+                    // الفرع يقبل أو يرفض طلبات زبائن فرعه
+                    || (isBranch()
+                        && myKey() != ''
+                        && resource.data.get('loc','') == myKey()
+                        && resource.data.status == 'new'
+                        && request.resource.data.status in ['accepted','rejected']
+                        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status','doneAt','by','rejectMsg']));
       allow delete: if isOwner();
+    }
+
+    // رقم واتساب كل فرع: يقرؤه الجميع، ويكتبه المالك أو الفرع نفسه
+    match /brinfo/{k} {
+      allow read: if true;
+      allow write: if isOwner() || (isBranch() && myKey() == k && request.resource.data.keys().hasOnly(['tel','name','at']));
     }
 
     // كلمات مرور الفروع: يراها المالك فقط، وكل فرع يحدّث كلمته فقط
