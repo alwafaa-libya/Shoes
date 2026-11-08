@@ -72,6 +72,12 @@ service cloud.firestore {
       allow update, delete: if isOwner();
     }
 
+    // كلمات مرور الفروع: يراها المالك فقط، وكل فرع يحدّث كلمته فقط
+    match /brpw/{em} {
+      allow read: if isOwner();
+      allow write: if isOwner() || (isBranch() && request.auth.token.email.lower() == em);
+    }
+
     match /prep/{orderId} {
       allow read: if true;
       allow create, update: if request.resource.data.keys().hasOnly(['done','total','ready','at'])
