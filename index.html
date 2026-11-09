@@ -318,9 +318,9 @@ function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){retur
 function money(n){return Number(n||0).toLocaleString('en-US')}
 function find(id){for(var i=0;i<D.products.length;i++)if(D.products[i].id===id)return D.products[i];return KNOWN[id]||null}
 function cartons(n){return n===1?'كرتونة واحدة':n===2?'كرتونتان':(n>=3&&n<=10?n+' كراتين':n+' كرتونة')}
-var LOCS=[['','الرئيسي'],['tr','طرابلس'],['bn','بنغازي'],['ms','مصراتة'],['aj','اجدابيا'],['by','البيضاء'],['tb','طبرق'],['mr','المعرض']],BRK=LOCS.slice(1).map(function(x){return x[0]});
+var LOCS=[['','الرئيسي'],['tr','طرابلس'],['bn','بنغازي'],['ms','مصراتة'],['aj','اجدابيا'],['by','البيضاء'],['tb','طبرق'],['mr','قسم رجالي']],BRK=LOCS.slice(1).map(function(x){return x[0]});
 function locName(k){for(var i=0;i<LOCS.length;i++)if(LOCS[i][0]===(k||''))return LOCS[i][1];return ''}
-function brKeyOf(n){var x=String(n||'').replace(/[أإآ]/g,'ا').trim();if(x.indexOf('بنغازي')>=0)return 'bn';for(var i=1;i<LOCS.length;i++)if(x===LOCS[i][1])return LOCS[i][0];return ''}
+function brKeyOf(n){var x=String(n||'').replace(/[أإآ]/g,'ا').trim();if(x.indexOf('بنغازي')>=0)return 'bn';if(x==='المعرض')return 'mr';for(var i=1;i<LOCS.length;i++)if(x===LOCS[i][1])return LOCS[i][0];return ''}
 function bq(p,k){if(!p)return 0;return k?Math.max(0,Math.round((p.bs&&p.bs[k])||0)):(p.stock||0)}
 var custLoc='',locSet=false;try{var lv=localStorage.getItem('wf_loc');if(lv!==null&&(lv===''||BRK.indexOf(lv)>=0)){custLoc=lv;locSet=true}}catch(e){}
 function av(p){return bq(p,custLoc)}
@@ -548,7 +548,7 @@ function sendOrder(){
 var man=null;
 /* حسابات الفروع: كل بريد = فرع. مسؤول الفرع يدخل لوحة الإدارة ويرى فقط شاشة «إدخال بضاعة واصلة» */
 var OWNER_EMAIL='kalzunni@gmail.com';
-var BR_USERS={'tripoli@alwafaa.ly':'طرابلس','misrata@alwafaa.ly':'مصراتة','ajdabiya@alwafaa.ly':'اجدابيا','benghazi@alwafaa.ly':'الرجالي بنغازي','maarad@alwafaa.ly':'المعرض','bayda@alwafaa.ly':'البيضاء','tobruk@alwafaa.ly':'طبرق'};
+var BR_USERS={'tripoli@alwafaa.ly':'طرابلس','misrata@alwafaa.ly':'مصراتة','ajdabiya@alwafaa.ly':'اجدابيا','benghazi@alwafaa.ly':'الرجالي بنغازي','maarad@alwafaa.ly':'قسم رجالي','bayda@alwafaa.ly':'البيضاء','tobruk@alwafaa.ly':'طبرق'};
 function uEmail(){return user&&user.email?String(user.email).toLowerCase():''}
 function role(){var e=uEmail();if(!e)return '';if(e===OWNER_EMAIL)return 'owner';if(BR_USERS[e])return 'branch';return 'none'}
 function myBranch(){return BR_USERS[uEmail()]||''}
@@ -622,7 +622,7 @@ function drawBs(){var el=document.getElementById('bsL');if(!el)return;var K=brKe
  el.innerHTML='<p class="note sm">إجمالي رصيد الفرع: <b class="num">'+tot+'</b> كرتونة'+(q?'':' — تظهر الأصناف التي لها رصيد فقط، وابحث لإضافة غيرها')+'</p>'+(A.length?A.map(function(p){return '<div class="bsrow"><span class="cth">'+(p.images&&p.images[0]?'<img src="'+p.images[0]+'" alt="">':'')+'</span><div class="cmid"><b class="num">'+esc(p.code)+'</b>'+(p.name?'<small>'+esc(p.name)+'</small>':'')+'<small>مقاس <span class="num">'+esc(p.sizes)+'</span></small></div><input type="number" min="0" inputmode="numeric" data-bsq="'+p.id+'" value="'+bq(p,K)+'" aria-label="الكمية بالكراتين"><button class="btn acc" data-bssave="'+p.id+'" type="button">حفظ</button></div>'}).join(''):'<p class="empty sm">'+(q?'لا يوجد صنف بهذا الرقم أو الاسم.':'لا يوجد رصيد للفرع بعد.')+'</p>')}
 function saveBs(id,btn){var K=brKeyOf(myBranch()),p=find(id),inp=document.querySelector('[data-bsq="'+id+'"]');if(!K||!p||!inp)return;var n=Math.max(0,Math.round(Number(digits(inp.value))||0));btn.disabled=true;
  var u={};u['bs.'+K]=n;fb.fs.updateDoc(fb.fs.doc(db,'products',id),u).then(function(){p.bs=Object.assign({},p.bs);p.bs[K]=n;btn.disabled=false;toast('✅ رصيد '+p.code+' في الفرع: '+cartons(n))},function(e){console.error(e);btn.disabled=false;toast(permMsg(e),4500)})}
-var BRANCHES=['طرابلس','مصراتة','اجدابيا','الرجالي بنغازي','المعرض','البيضاء','طبرق'];
+var BRANCHES=['طرابلس','مصراتة','اجدابيا','الرجالي بنغازي','قسم رجالي','البيضاء','طبرق'];
 function manBr(){var S=[];try{S=JSON.parse(localStorage.getItem('wf_branches')||'[]')}catch(e){}return BRANCHES.concat(S.filter(function(x){return BRANCHES.indexOf(x)<0}))}
 function manKeepBr(n){var B=manBr().filter(function(x){return x!==n});B.unshift(n);try{localStorage.setItem('wf_branches',JSON.stringify(B.slice(0,30)))}catch(e){}}
 function manNew(){man={L:{},ord:[],q:'',name:'',city:'',tel:'',note:'',imp:null}}
@@ -1262,7 +1262,7 @@ document.addEventListener('click',function(e){
  if(ds.accept){acceptOrder(ds.accept);return}
  if(ds.mcancel){if(ds.sure)cancelManual(ds.mcancel);else{ds.sure='1';t.textContent='متأكد؟ اضغط مرة ثانية لإلغاء الفاتورة وإرجاع الكمية'}return}
  if(ds.mcat&&man){man.cat=ds.mcat;manDrawRes();return}
- if(ds.mbr!=null&&man){var BC={'الرجالي بنغازي':'بنغازي','المعرض':''};man.name=ds.mbr;man.city=BC.hasOwnProperty(ds.mbr)?BC[ds.mbr]:ds.mbr;man.cat='';openManual();return}
+ if(ds.mbr!=null&&man){var BC={'الرجالي بنغازي':'بنغازي','قسم رجالي':''};man.name=ds.mbr;man.city=BC.hasOwnProperty(ds.mbr)?BC[ds.mbr]:ds.mbr;man.cat='';openManual();return}
  if(t.id==='mNameOk'&&man){var mn=document.getElementById('mName');var nv=mn&&mn.value.trim();if(!nv){toast('اكتب اسم الزبون أو اختر فرعاً');return}man.name=nv;openManual();return}
  if(ds.mchg&&man){manSync();man.name='';openManual();return}
  if(ds.mpick&&man){manPickId(ds.mpick);return}
