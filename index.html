@@ -569,11 +569,11 @@ function brSaleCard(o){var c=o.customer||{},T=o.totals||{};return '<article clas
  (o.status==='new'?'<div class="two-b"><button class="btn acc" data-bacc="'+o.id+'" type="button">قبول وإرسال رد للزبون</button><button class="btn ghost" data-brej="'+o.id+'" type="button">رفض وإرجاع الكمية</button></div>':(c.tel?'<div class="two-b"><a class="wa2" href="'+waLink(o,o.status==='accepted')+'" target="_blank" rel="noopener">مراسلة الزبون على الواتساب</a></div>':''))+'</article>'}
 function brAccept(id){var o=brSales.filter(function(x){return x.id===id})[0];if(!o)return;var w=window.open(waLink(o,true),'_blank');
  fb.fs.updateDoc(fb.fs.doc(db,'orders',id),{status:'accepted',doneAt:fb.fs.serverTimestamp(),by:uEmail()}).catch(function(e){console.error(e);toast(permMsg(e))});if(!w)location.href=waLink(o,true)}
-function brReject(id){var o=brSales.filter(function(x){return x.id===id})[0];if(!o)return;var F=fb.fs,K=o.loc;
+function brReject(id,msg){var o=brSales.filter(function(x){return x.id===id})[0];if(!o)return;var F=fb.fs,K=o.loc;
  F.runTransaction(db,function(tx){var L=o.lines||[],refs=L.map(function(l){return F.doc(db,'products',l.id||'x')}),oref=F.doc(db,'orders',id);
   return Promise.all([tx.get(oref)].concat(refs.map(function(r){return tx.get(r)}))).then(function(S){if(S[0].data().status!=='new')return;
-   S.slice(1).forEach(function(ps,i){if(ps.exists()){var u={};u['bs.'+K]=bq(ps.data(),K)+(L[i].q||0);tx.update(refs[i],u)}});tx.update(oref,{status:'rejected',doneAt:F.serverTimestamp(),by:uEmail()})})})
- .then(function(){toast('تم رفض الطلب وإرجاع الكمية لرصيد الفرع');window.open(waLink(o,false),'_blank')},function(e){console.error(e);toast(permMsg(e))})}
+   S.slice(1).forEach(function(ps,i){if(ps.exists()){var u={};u['bs.'+K]=bq(ps.data(),K)+(L[i].q||0);tx.update(refs[i],u)}});tx.update(oref,{status:'rejected',doneAt:F.serverTimestamp(),by:uEmail(),rejectMsg:msg||''})})})
+ .then(function(){closeSheets();toast('تم رفض الطلب وإرجاع الكمية لرصيد الفرع');window.open(waLink(o,false,msg),'_blank')},function(e){console.error(e);closeSheets();toast(permMsg(e))})}
 function brTelBox(){var K=brKeyOf(myBranch()),t=(BRI[K]||{}).tel||'';return '<div class="storeset"><label>📞 رقم واتساب الفرع (تصله فواتير زبائن فرعكم)<input id="brTel" type="tel" inputmode="tel" dir="ltr" placeholder="09xxxxxxxx" value="'+esc(t)+'"></label><button class="btn acc" id="brTelSave" type="button">حفظ الرقم</button>'+(t?'':'<small style="color:var(--warn)">⚠️ لم يُسجَّل رقم بعد: الزبون لن يجد زر إرسال الفاتورة لفرعكم.</small>')+'</div>'}
 function brTelSave(v){var K=brKeyOf(myBranch()),n=digits(v);if(waOf(n).length<9){toast('اكتب رقم واتساب صحيح');return Promise.reject()}
  return fb.fs.setDoc(fb.fs.doc(db,'brinfo',K),{tel:v.trim(),name:myBranch(),at:fb.fs.serverTimestamp()}).then(function(){BRI[K]={tel:v.trim()};toast('✅ تم حفظ رقم الفرع')},function(e){console.error(e);toast(permMsg(e));throw e})}
@@ -919,12 +919,12 @@ function orderCard(o){
 }
 var RJT={cap:function(o){var c=o.customer||{};return 'مرحباً '+(c.name||'')+'،\nبخصوص طلبكم رقم '+o.no+':\n\nنعتذر منكم، لم يسمح النظام بتمرير هذه الفاتورة لأن قيمتها تتجاوز السقف المسموح به في حسابكم.\n\nولإتمام طلبكم، يُرجى سداد دفعة من المستحقات السابقة أو جزء من قيمة الفاتورة، وبعدها تمرّ الفاتورة مباشرة ويتم تجهيز طلبكم ✅\n\nللتنسيق تواصلوا معنا على هذا الرقم.\nشاكرين حسن تعاملكم 🌷\n'+D.shop},
  gen:function(o){var c=o.customer||{};return 'مرحباً '+(c.name||'')+'،\nنعتذر، لم نتمكن من قبول طلبكم رقم '+o.no+'.\n'+D.shop}};
-function openReject(id){var o=orders.filter(function(x){return x.id===id})[0];if(!o)return;
+function openReject(id,br){var o=(br?brSales:orders).filter(function(x){return x.id===id})[0];if(!o)return;
  sheet('rjS','سبب الرفض','<div class="shd"><h2>رفض الطلب '+esc(o.no)+'</h2><button class="x" data-close="1" type="button" aria-label="إغلاق">✕</button></div>'+
  '<p class="note">اختر سبب الرفض. هذه الرسالة تُرسل للزبون على واتساب، وتقدر تعدّل نصها قبل الإرسال.</p>'+
  '<div class="two-b"><button class="btn ghost" data-rjt="cap" type="button">💳 تجاوز السقف المسموح</button><button class="btn ghost" data-rjt="gen" type="button">اعتذار عام</button></div>'+
  '<textarea id="rjMsg" dir="rtl" style="width:100%;min-height:230px;margin:10px 0;padding:10px;border:1px solid #ccc;border-radius:10px;font:inherit;line-height:1.7;box-sizing:border-box">'+esc(RJT.cap(o))+'</textarea>'+
- '<div class="acts"><button class="btn acc lg" data-rjgo="'+id+'" type="button">رفض الطلب وإرجاع الكمية وإرسال الرسالة</button><button class="btn ghost" data-close="1" type="button">تراجع</button></div>')}
+ '<div class="acts"><button class="btn acc lg" data-rjgo="'+id+'"'+(br?' data-rjbr="1"':'')+' type="button">رفض الطلب وإرجاع الكمية وإرسال الرسالة</button><button class="btn ghost" data-close="1" type="button">تراجع</button></div>')}
 function waLink(o,ok,msg){var c=o.customer||{},T=o.totals||{};
  if(msg)return 'https://wa.me/'+waOf(c.tel)+'?text='+encodeURIComponent(msg);
  var t=ok?('مرحباً '+(c.name||'')+'،\nتم قبول طلبكم رقم '+o.no+' ✅\nسنتواصل معكم لترتيب التسليم.\n\n'+orderText(o)):
@@ -1234,7 +1234,7 @@ document.addEventListener('click',function(e){
  if(ds.pwed){pwEdit(ds.pwed);return}
  if(ds.brtab){brTab=ds.brtab;render();return}
  if(ds.bacc){brAccept(ds.bacc);return}
- if(ds.brej){if(!t.dataset.sure){t.dataset.sure='1';t.textContent='متأكد؟ اضغط مرة ثانية';return}brReject(ds.brej);return}
+ if(ds.brej){openReject(ds.brej,true);return}
  if(t.id==='brTelSave'){var bv=document.getElementById('brTel');if(bv)brTelSave(bv.value).then(function(){render()},function(){});return}
  if(ds.medit){if(man&&man.ord.length&&!man.edit&&!confirmDraft())return;editManual(ds.medit);return}
  if(t.id==='xlView'){xlView();return}
@@ -1280,8 +1280,8 @@ document.addEventListener('click',function(e){
  if(t.id==='mAdd'&&man){manAdd();return}
  if(ds.minc||ds.mdec||ds.mrm){manSync();var mi=ds.minc||ds.mdec||ds.mrm;manSet(mi,ds.mrm?0:(man.L[mi]||0)+(ds.minc?1:-1));if(ds.minc&&!ds.mrm&&t.classList.contains('madd')){var mp2=find(mi);if(mp2)toast('أُضيف '+mp2.code+' — '+cartons(man.L[mi]||0))}manDraw();return}
  if(ds.reject){openReject(ds.reject);return}
- if(ds.rjt){var ro=orders.filter(function(x){return x.id===(document.querySelector('[data-rjgo]')||{}).dataset.rjgo})[0],ta=document.getElementById('rjMsg');if(ro&&ta)ta.value=RJT[ds.rjt](ro);return}
- if(ds.rjgo){var rm=(document.getElementById('rjMsg').value||'').trim();t.disabled=true;t.textContent='جارٍ الرفض…';rejectOrder(ds.rjgo,rm);return}
+ if(ds.rjt){var rgb=document.querySelector('[data-rjgo]')||{dataset:{}},ro=(rgb.dataset.rjbr?brSales:orders).filter(function(x){return x.id===rgb.dataset.rjgo})[0],ta=document.getElementById('rjMsg');if(ro&&ta)ta.value=RJT[ds.rjt](ro);return}
+ if(ds.rjgo){var rm=(document.getElementById('rjMsg').value||'').trim();t.disabled=true;t.textContent='جارٍ الرفض…';if(ds.rjbr)brReject(ds.rjgo,rm);else rejectOrder(ds.rjgo,rm);return}
  if(ds.readai){readCard(find(ds.readai));return}
  if(ds.savep){var sp=find(ds.savep);sp._dirty=false;saveProduct(sp);return}
  if(ds.delp){if(ds.sure){var dp=ds.delp;fb.fs.deleteDoc(fb.fs.doc(db,'products',dp)).then(function(){fb.fs.deleteDoc(fb.fs.doc(db,'imgs',dp)).catch(function(){});delete FULL[dp];toast('تم حذف الصنف')},function(er){toast(permMsg(er))})}else{ds.sure='1';t.textContent='اضغط مرة ثانية لتأكيد الحذف'}return}
