@@ -261,6 +261,14 @@ label.f input,label.f textarea{border:1.5px solid var(--line);border-radius:10px
 .cpick button:active{background:var(--soft)}
 .ed select,.catset select{border:1.5px solid var(--line);border-radius:8px;background:var(--bg);padding:5px 8px;width:100%;color:var(--ink);font-weight:700}
 .ed .catl{font-size:.85rem;font-weight:700;color:var(--ink)}.ed .catl select{padding:8px;font-size:1rem;border-width:2px;margin-top:2px}
+.card.mini{padding:0}
+.minib{display:flex;flex-direction:column;align-items:center;gap:6px;width:100%;border:0;background:none;padding:8px 8px 10px;font:inherit;color:inherit;cursor:pointer}
+.minib img{width:100%;aspect-ratio:1;object-fit:cover;border-radius:12px;display:block}
+.minib .noimg{width:100%;aspect-ratio:1;border-radius:12px;background:var(--line);display:flex;align-items:center;justify-content:center;text-align:center;font-size:.85rem}
+.minib b{font-size:1.05rem}
+.minib small{color:var(--muted,#888);font-size:.78rem}
+.mtags{display:flex;gap:4px;flex-wrap:wrap;justify-content:center}.mtags i{font-style:normal;font-size:.75rem;background:#fdecef;color:#a3244f;border-radius:8px;padding:1px 6px}
+.minic{width:100%;border:1px dashed var(--line);background:none;border-radius:10px;padding:6px;font:inherit;font-weight:700;color:inherit;margin-bottom:6px;cursor:pointer}
 .hidebtn{border:2px solid var(--ok);background:#e7f5ee;color:var(--ok);border-radius:10px;padding:7px 8px;font-weight:800;font-size:.9rem}
 .hidebtn.off{border-color:#8a8a8a;background:#eee;color:#555}
 .card.hiddencard .thumbs,.card.hiddencard .ed>label:not(.catl){opacity:.5}
@@ -980,7 +988,14 @@ function renderStore(){var S=storeMode,L=S.l,d=(prepDoc&&prepDoc.done)||[],k=L.f
  h+='<p class="note">اضغط مربع «تم التجهيز» تحت الصنف عند تجهيزه فيظهر عليه ✓. للإلغاء اضغط مرة ثانية.</p></div>';
  app.innerHTML=h}
 function storeLink(o){var n=waOf(storeNum());return (n.length>=9?'https://wa.me/'+n:'https://wa.me/')+'?text='+encodeURIComponent(storeText(o))}
+var OPEN={};
 function editCard(p){
+ var ck0=chk[p.id],must=p._dirty||(ck0&&ck0.s!=='ok')||(p.code==='صنف جديد'&&p.images&&p.images.length);
+ if(!OPEN[p.id]&&!must){var im0=(p.images||[])[0];
+  return '<article class="card mini'+(p.hidden?' hiddencard':'')+'"><button class="minib" data-open="'+p.id+'" type="button">'+(im0?'<img src="'+im0+'" alt="">':'<span class="noimg">📷<br>بدون صورة</span>')+'<b class="num" dir="ltr">'+esc(p.code)+'</b>'+(p.hidden||!catName(p.cat)?'<span class="mtags">'+(p.hidden?'<i>🚫 مخفي</i>':'')+(!catName(p.cat)?'<i>📂 بدون قسم</i>':'')+'</span>':'')+'<small>اضغط لعرض التفاصيل ▼</small></button></article>'}
+ return editCard0(p).replace('<div class="ed">','<div class="ed">'+(must?'':'<button class="minic" data-open="'+p.id+'" type="button">▲ إخفاء التفاصيل</button>'));
+}
+function editCard0(p){
  var th=(p.images||[]).map(function(src,i){return '<div class="t'+(i===0?' main':'')+'"><img src="'+src+'" alt="" data-zp="'+p.id+'" data-zi="'+i+'"><button data-rmimg="'+p.id+'" data-i="'+i+'" type="button" aria-label="حذف الصورة">×</button>'+(i?'<button class="mk" data-mainimg="'+p.id+'" data-i="'+i+'" type="button" aria-label="اجعلها الرئيسية">★</button>':'')+'</div>'}).join('');
  var ck=chk[p.id],bd='';
  if(ck)bd=ck.s==='ok'?'<div class="chk ok">✅ الصورة مطابقة لرقم الصنف</div>':
@@ -1264,6 +1279,7 @@ document.addEventListener('click',function(e){
  if(ds.newsx){newsMark('');render();return}
  if(ds.newscat){var nc=ds.newscat;newsMark(nc);setCat(nc);return}
  if(ds.cat){setCat(ds.cat);return}
+ if(ds.open){OPEN[ds.open]=!OPEN[ds.open];render();return}
  if(ds.hide){var hp=find(ds.hide);if(!hp)return;hp.hidden=!hp.hidden;if(KNOWN[hp.id]&&fb&&D.fromDb){KNOWN[hp.id].hidden=hp.hidden;fb.fs.setDoc(fb.fs.doc(db,'products',hp.id),{hidden:hp.hidden},{merge:true}).then(function(){toast(hp.hidden?'🚫 '+hp.code+' مخفي عن الزبائن':'👁️ '+hp.code+' ظاهر للزبائن')},function(er){console.error(er);toast(permMsg(er))})}else hp._dirty=true;render();return}
  if(ds.admcat){admCat=ds.admcat;render();return}
  if(ds.pvcat){pvCat=ds.pvcat;render();return}
