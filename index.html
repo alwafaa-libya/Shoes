@@ -269,6 +269,7 @@ label.f input,label.f textarea{border:1.5px solid var(--line);border-radius:10px
 .minib small{color:var(--muted,#888);font-size:.78rem}
 .mtags{display:flex;gap:4px;flex-wrap:wrap;justify-content:center}.mtags i{font-style:normal;font-size:.75rem;background:#fdecef;color:#a3244f;border-radius:8px;padding:1px 6px}
 .minic{width:100%;border:1px dashed var(--line);background:none;border-radius:10px;padding:6px;font:inherit;font-weight:700;color:inherit;margin-bottom:6px;cursor:pointer}
+.cpkadd{display:flex;gap:6px;padding:10px 8px 4px;border-top:1px dashed var(--line);margin-top:4px}.cpkadd input{flex:1;min-width:0;border:1px solid var(--line);border-radius:10px;padding:8px 10px;font:inherit;background:var(--surface);color:var(--ink)}.cpkadd .btn{white-space:nowrap}
 .hidebtn{border:2px solid var(--ok);background:#e7f5ee;color:var(--ok);border-radius:10px;padding:7px 8px;font-weight:800;font-size:.9rem}
 .hidebtn.off{border-color:#8a8a8a;background:#eee;color:#555}
 .card.hiddencard .thumbs,.card.hiddencard .ed>label:not(.catl){opacity:.5}
@@ -700,11 +701,11 @@ function xlView(){var L=D.products.filter(function(p){return inCat(p,admCat)}).s
   var ws=X.utils.aoa_to_sheet(rows);ws['!cols']=head.map(function(h,i){return {wch:i===1?16:i===2?20:10}});ws['!views']=[{RTL:true}];
   var wb=X.utils.book_new();wb.Workbook={Views:[{RTL:true}]};X.utils.book_append_sheet(wb,ws,'الأصناف');X.writeFile(wb,'أصناف-'+viewName().replace(/[\\/:*?"<>|]/g,'-')+'-'+today().replace(/\//g,'-')+'.xlsx');
   toast('📥 تم تنزيل شيت '+L.length+' صنف — '+viewName(),4000)},function(){toast('تعذّر تحميل أداة الإكسل. تأكد من الإنترنت.')})}
-function ctrTabs(){var M={},none=0,L=D.products.filter(function(p){return !p.pend});L.forEach(function(p){var c=String(p.ctr||'').trim();if(c)M[c]=(M[c]||0)+1;else none++});var K=Object.keys(M).sort(function(a,b){return a.localeCompare(b,'ar')});if(!K.length&&!none)return '';
+function ctrTabs(){var M={},none=0,L=D.products.filter(function(p){return !p.pend});L.forEach(function(p){var c=String(p.ctr||'').trim();if(c)M[c]=(M[c]||0)+1;else none++});((SITE&&SITE.ctrs)||[]).forEach(function(c){c=String(c||'').trim();if(c&&!M[c])M[c]=0});var K=Object.keys(M).sort(function(a,b){return a.localeCompare(b,'ar')});if(!K.length&&!none)return '';
  return ctrPick('a',K.map(function(k){return ['ctr:'+k,k,M[k]]}).concat(none?[['noctr','⚠️ بدون تصنيف',none]]:[]),admCat,'— اختر حاوية —')}
 function ctrPick(id,items,cur,ph){var sel=items.filter(function(x){return x[0]===cur})[0];
  return '<div class="cpk" data-cpk="'+id+'"><span class="cpkh">🏷️ التصنيف (الحاوية)</span><button class="cpkb" data-cpkt="'+id+'" type="button">'+(sel?'<b class="cpkn" dir="ltr">'+esc(sel[1])+'</b><span class="cnt">'+sel[2]+' صنف</span>':'<span class="cpkph">'+esc(ph||'اختر')+'</span>')+'<i>▾</i></button><div class="cpkl" hidden>'+
- items.map(function(x){return '<button class="cpko'+(x[0]===cur?' on':'')+'" data-cpkv="'+esc(x[0])+'" data-cpkid="'+id+'" type="button"><b class="cpkn" dir="ltr">'+esc(x[1])+'</b><span class="cnt">'+x[2]+' صنف</span></button>'}).join('')+'</div></div>'}
+ items.map(function(x){return '<button class="cpko'+(x[0]===cur?' on':'')+'" data-cpkv="'+esc(x[0])+'" data-cpkid="'+id+'" type="button"><b class="cpkn" dir="ltr">'+esc(x[1])+'</b><span class="cnt">'+x[2]+' صنف</span></button>'}).join('')+(id==='a'?'<div class="cpkadd"><input id="ctrNewIn" placeholder="اسم تصنيف جديد، مثال: 644" autocomplete="off"><button class="btn acc" id="ctrNewGo" type="button">➕ إضافة تصنيف</button></div>':'')+'</div></div>'}
 function manDraw(){manDrawLines();manDrawRes()}
 function manDrawLines(){var el=document.getElementById('mLines');if(!el)return;var L=manLines(),T=totals(L),isB=role()==='branch';
  if(!L.length){el.innerHTML='<p class="empty sm">الفاتورة فارغة. اكتب رقم الصنف في الأعلى، ثم عدد الكراتين، واضغط «أضف».</p>';return}
@@ -732,7 +733,7 @@ function sentMap(K){var M={};if(!K)return M;(role()==='branch'?brOrders:orders).
 function sentTag(p,K,S){if(!K)return '';var x=S[p.id],b=bq(p,K);if(!x&&!b)return '';return '<small class="msent">⚠️ '+(x?'سبق نقله لفرع '+esc(locName(K))+': '+cartons(x.q)+(x.n>1?' ('+x.n+' مرات)':'')+(x.last?' — آخر مرة '+esc(x.last):''):'موجود في فرع '+esc(locName(K)))+(b?' · رصيد الفرع الآن: '+cartons(b):'')+'</small>'}
 function wasCls(p,K,S){return K&&(S[p.id]||bq(p,K)>0)?' was':''}
 var xlCtr='';
-function ctrList(){var M={};D.products.forEach(function(p){var c=String(p.ctr||'').trim();if(c)M[c]=(M[c]||0)+1});return Object.keys(M).sort(function(a,b){return a.localeCompare(b,'ar')})}
+function ctrList(){var M={};((SITE&&SITE.ctrs)||[]).forEach(function(c){c=String(c||'').trim();if(c)M[c]=M[c]||0});D.products.forEach(function(p){var c=String(p.ctr||'').trim();if(c)M[c]=(M[c]||0)+1});return Object.keys(M).sort(function(a,b){return a.localeCompare(b,'ar')})}
 function ctrDl(){return '<datalist id="ctrDl">'+ctrList().map(function(c){return '<option value="'+esc(c)+'">'}).join('')+'</datalist>'}
 function ctrAsk(){sheet('ctrS','تصنيف الحاوية','<div class="shd"><h2>🏷️ تصنيف الحاوية</h2><button class="x" data-close="1" type="button" aria-label="إغلاق">✕</button></div><p class="note">قبل استيراد ملف الإكسل: اكتب تصنيف هذه الحاوية (مثل رقمها أو اسمها). كل أصناف الملف الجديدة تأخذ هذا التصنيف، وتستطيع اختياره في الفاتورة اليدوية.</p>'+
  '<label class="f">تصنيف الحاوية *<input id="ctrIn" list="ctrDl" value="'+esc(xlCtr)+'" placeholder="مثال: TAHER636" autocomplete="off"></label>'+ctrDl()+
@@ -919,7 +920,7 @@ function renderAdmin(){
    h+='<div class="pendbox"><div><b>📥 دفعة جديدة قيد المراجعة: <span class="num">'+acn.pend+'</span> صنف</b><span>هذه الأصناف منفصلة عن أصنافك السابقة ولا تظهر للزبائن حتى تعتمدها. راجعها واربط الصور، ثم اضغط «اعتماد». بعد الاعتماد تنضم للأصناف وتصنّف كل صنف في قسمه.</span>'+(pNo||pOr?'<span class="pw">'+(pNo?'⚠️ '+pNo+' صنف بدون صورة. ':'')+(pOr?'⚠️ '+pOr+' صورة غير مربوطة بصنف.':'')+'</span>':'<span class="pk">✅ كل الأصناف فيها صور</span>')+'</div><div class="xbtns">'+(admCat!=='pend'?'<button class="btn ghost" data-admcat="pend" type="button">عرض الدفعة</button>':'')+'<button class="scan" id="approve" type="button">✅ اعتماد الدفعة</button></div></div>'}
   h+='<div class="grid"><div class="catset" style="display:block"><b>📂 الأقسام</b>'+(acn.none?' <span style="color:var(--warn);font-weight:700;display:inline">— '+acn.none+' صنف بدون قسم لا يظهر للزبائن</span>':'')+catTabs(admCat,'admcat',acn).replace('margin:0 0 16px','')+ctrTabs()+'<button class="btn ghost" id="xlView" type="button" style="margin-top:8px">📥 تنزيل شيت إكسل لأصناف '+esc(viewName())+'</button></div>';
   var AL=D.products.filter(function(p){return inCat(p,admCat)&&(!chkOnly||p._dirty||(chk[p.id]&&chk[p.id].s!=='ok'))});
-  if(AL.length&&D.fromDb)h+='<div class="catset"><span>نقل كل الأصناف المعروضة الآن ('+AL.length+' صنف) إلى قسم واحد دفعة واحدة:</span><select id="bulkCat"><option value="">— اختر القسم —</option>'+catOpts('')+'</select><button class="btn acc" id="bulkGo" type="button">تطبيق</button><span>أو إخفاء / إظهار كل هذه الأصناف للزبائن:</span><button class="btn ghost" id="bulkHide" type="button">🚫 إخفاء الكل</button><button class="btn ghost" id="bulkShow" type="button">👁️ إظهار الكل</button></div>';
+  if(AL.length&&D.fromDb)h+='<div class="catset"><span>نقل كل الأصناف المعروضة الآن ('+AL.length+' صنف) إلى قسم واحد دفعة واحدة:</span><select id="bulkCat"><option value="">— اختر القسم —</option>'+catOpts('')+'</select><button class="btn acc" id="bulkGo" type="button">تطبيق</button><span>أو إخفاء / إظهار كل هذه الأصناف للزبائن:</span><button class="btn ghost" id="bulkHide" type="button">🚫 إخفاء الكل</button><button class="btn ghost" id="bulkShow" type="button">👁️ إظهار الكل</button><span>🏷️ تصنيف الحاوية: اكتب تصنيفاً جديداً أو اختر من القائمة</span><input id="bulkCtrIn" class="msearch" list="ctrDl" placeholder="مثال: TAHER641" autocomplete="off"><button class="btn ghost" id="ctrAdd" type="button">➕ إضافة التصنيف للقائمة فقط</button><button class="btn acc" id="bulkCtr" type="button">إعطاء هذا التصنيف للأصناف المعروضة ('+AL.length+')</button></div>';
   h+=AL.map(editCard).join('')+'<button class="newcard" id="addProd" type="button">+ صنف جديد'+(catName(admCat)?' في قسم '+catName(admCat):'')+'</button></div>';
   h+='<p class="note">كل صنف يُحفظ بزر «حفظ» الخاص به، ويظهر التعديل للزبائن فوراً.</p>';
  }
@@ -1211,6 +1212,16 @@ function bulkHide(btn,h){var L=D.products.filter(function(p){return inCat(p,admC
  btn.disabled=true;var F=fb.fs,jobs=[];for(var i=0;i<L.length;i+=400){var b=F.writeBatch(db);L.slice(i,i+400).forEach(function(p){b.set(F.doc(db,'products',p.id),{hidden:h},{merge:true});p.hidden=h});jobs.push(b.commit())}
  Promise.all(jobs).then(function(){render();toast((h?'🚫 تم إخفاء ':'👁️ تم إظهار ')+L.length+' صنف',4000)},function(e){console.error(e);btn.disabled=false;toast(permMsg(e),4500)})}
 function setCat(c){if(!catName(c)&&c!=='plastic')return;if(catName(c)&&NEWS.length)newsMark(c);custCat=c;try{localStorage.setItem('wf_cat',c)}catch(e){}subProducts();render();scrollTo(0,0)}
+function ctrAdd(btn,fid){var inp=document.getElementById(fid||'bulkCtrIn'),v=inp&&inp.value.trim();if(!v){toast('اكتب اسم التصنيف أولاً');if(inp)inp.focus();return}
+ if(ctrList().indexOf(v)>=0){toast('التصنيف «'+v+'» موجود في القائمة');return}
+ var L=((SITE&&SITE.ctrs)||[]).concat([v]);btn.disabled=true;var F=fb.fs;
+ F.setDoc(F.doc(db,'products','_site'),{ctrs:L},{merge:true}).then(function(){SITE.ctrs=L;render();toast('🏷️ أُضيف التصنيف «'+v+'» — تجده الآن في القوائم',4000)},function(e){console.error(e);btn.disabled=false;toast(permMsg(e),4500)})}
+function bulkCtr(btn){var inp=document.getElementById('bulkCtrIn'),v=inp&&inp.value.trim();if(!v){toast('اكتب أو اختر التصنيف أولاً');if(inp)inp.focus();return}
+ var L=D.products.filter(function(p){return inCat(p,admCat)&&(!chkOnly||p._dirty||(chk[p.id]&&chk[p.id].s!=='ok'))});if(!L.length)return;
+ if(btn.dataset.sure!==v){btn.dataset.sure=v;btn.textContent='متأكد؟ تصنيف '+L.length+' صنف «'+v+'»';return}
+ btn.disabled=true;btn.textContent='جارٍ الحفظ…';var F=fb.fs,jobs=[];
+ for(var i=0;i<L.length;i+=400){var b=F.writeBatch(db);L.slice(i,i+400).forEach(function(p){b.set(F.doc(db,'products',p.id),{ctr:v},{merge:true});p.ctr=v});jobs.push(b.commit())}
+ Promise.all(jobs).then(function(){render();toast('🏷️ تم تصنيف '+L.length+' صنف: '+v,4000)},function(e){console.error(e);btn.disabled=false;btn.textContent='إعطاء هذا التصنيف للأصناف المعروضة';toast(permMsg(e),4500)})}
 function bulkCat(btn){var sel=document.getElementById('bulkCat'),c=sel&&sel.value;if(!catName(c)){toast('اختر القسم أولاً');return}
  var L=D.products.filter(function(p){return inCat(p,admCat)&&(!chkOnly||p._dirty||(chk[p.id]&&chk[p.id].s!=='ok'))});if(!L.length)return;
  if(btn.dataset.sure!==c){btn.dataset.sure=c;btn.textContent='متأكد؟ نقل '+L.length+' صنف إلى «'+catName(c)+'»';return}
@@ -1308,6 +1319,9 @@ document.addEventListener('click',function(e){
  if(ds.ctrset!=null){var ci=document.getElementById('ctrIn');if(ci){ci.value=ds.ctrset;xlCtr=ds.ctrset}return}
  if(t.id==='xlsPre'){ctrAsk();return}
  if(t.id==='ctrOldGo'){ctrOld(t);return}
+ if(t.id==='ctrAdd'){ctrAdd(t);return}
+ if(t.id==='ctrNewGo'){ctrAdd(t,'ctrNewIn');return}
+ if(t.id==='bulkCtr'){bulkCtr(t);return}
  if(t.id==='ctrXl'){ctrXlAsk();return}
  if(t.id==='mAdd'&&man){manAdd();return}
  if(ds.minc||ds.mdec||ds.mrm){manSync();var mi=ds.minc||ds.mdec||ds.mrm;manSet(mi,ds.mrm?0:(man.L[mi]||0)+(ds.minc?1:-1));if(ds.minc&&!ds.mrm&&t.classList.contains('madd')){var mp2=find(mi);if(mp2)toast('أُضيف '+mp2.code+' — '+cartons(man.L[mi]||0))}manDraw();return}
