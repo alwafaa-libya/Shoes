@@ -269,6 +269,15 @@ label.f input,label.f textarea{border:1.5px solid var(--line);border-radius:10px
 .catset select{width:auto;flex:1;min-width:120px}
 .catset span{color:var(--muted);font-size:.88rem;flex-basis:100%}
 .savebar{grid-column:1/-1;position:sticky;top:8px;z-index:5;display:flex;justify-content:space-between;align-items:center;gap:10px;background:var(--ink);color:var(--bg);border-radius:14px;padding:10px 14px;font-weight:700}
+.pbar{position:fixed;left:0;right:0;bottom:0;z-index:90;background:#1F3864;color:#fff;padding:10px 14px calc(12px + env(safe-area-inset-bottom,0px));box-shadow:0 -4px 16px rgba(0,0,0,.25);font-weight:700;direction:rtl}
+.pbar .pt{display:flex;justify-content:space-between;gap:10px;margin-bottom:7px;font-size:15px}
+.pbar .tr{height:14px;background:rgba(255,255,255,.25);border-radius:99px;overflow:hidden}
+.pbar .fl{height:100%;width:0;background:#FFC000;border-radius:99px;transition:width .3s}
+.pbar.ind .fl{width:35%!important;animation:pbi 1.2s ease-in-out infinite}
+@keyframes pbi{0%{margin-right:-35%}100%{margin-right:100%}}
+.pbar.ok{background:#1e7d32}.pbar.ok .fl{background:#fff;width:100%!important;animation:none}
+.pbar.bad{background:#b3261e}.pbar.bad .fl{background:#fff;width:100%!important;animation:none}
+.pbar small{opacity:.85;font-weight:600}
 </style>
 </head><body>
 <div id="app" dir="rtl"></div>
@@ -333,6 +342,13 @@ function setLoc(k){custLoc=k;locSet=true;loadBri(k);try{localStorage.setItem('wf
 function locPick(){return '<h2 class="brand" style="font-size:1.3rem;text-align:center;margin:10px 0 2px">📍 اختر الفرع الذي تريد الشراء منه</h2><p class="note" style="text-align:center">تظهر لك البضاعة المتوفرة في الفرع الذي تختاره. يمكنك تغييره لاحقاً من أعلى الصفحة.</p><div class="cpick lpick">'+LOCS.map(function(x){return '<button type="button" data-loc="'+x[0]+'"><span>'+(x[0]?'🏬':'🏢')+'</span>'+x[1]+'</button>'}).join('')+'</div>'}
 function locBar(){return '<div class="locbar'+(locSet?'':' need')+'"><b>📍 الفرع</b><select id="locSel" aria-label="اختر الفرع">'+(locSet?'':'<option value="" disabled selected>— اختر الفرع أولاً —</option>')+LOCS.map(function(x){return '<option value="'+x[0]+'"'+(locSet&&custLoc===x[0]?' selected':'')+'>'+x[1]+'</option>'}).join('')+'</select></div>'}
 function toast(t,ms){var el=document.createElement('div');el.className='toast';el.textContent=t;document.body.appendChild(el);setTimeout(function(){el.remove()},ms||2800)}
+var PB=null,PBt=null;
+function prog(label,done,total){clearTimeout(PBt);if(!PB){PB=document.createElement('div');PB.className='pbar';PB.innerHTML='<div class="pt"><span class="pl"></span><span class="pn"></span></div><div class="tr"><div class="fl"></div></div>';document.body.appendChild(PB)}
+ PB.className='pbar'+(total?'':' ind');PB.querySelector('.pl').textContent='⏳ '+label;
+ PB.querySelector('.pn').textContent=total?(done+' من '+total+' — '+Math.round(done*100/total)+'%'):'جارٍ…';PB.querySelector('.fl').style.width=total?(done*100/total)+'%':''}
+function progEnd(ok,msg){if(!PB)return;PB.className='pbar '+(ok?'ok':'bad');PB.querySelector('.pl').textContent=(ok?'✅ ':'⚠️ ')+(msg||(ok?'انتهى التحميل':'لم يكتمل التحميل'));PB.querySelector('.pn').textContent=ok?'100%':'';
+ clearTimeout(PBt);PBt=setTimeout(function(){if(PB){PB.remove();PB=null}},ok?4000:6000)}
+
 function digits(s){return String(s||'').replace(/[٠-٩]/g,function(d){return '٠١٢٣٤٥٦٧٨٩'.indexOf(d)}).replace(/\D/g,'')}
 function waOf(s){var n=digits(s).replace(/^00/,'');if(/^0\d{9}$/.test(n))n='218'+n.slice(1);else if(/^9\d{8}$/.test(n))n='218'+n;return n}
 function cartCount(){var n=0;for(var k in cart)n+=cart[k];return n}
@@ -719,15 +735,15 @@ function ctrXlAsk(){sheet('ctrS','تصنيف حسب ملف الحاوية','<div
  '<label class="f">اسم الحاوية *<input id="ctrIn" list="ctrDl" value="" placeholder="مثال: TAHER636" autocomplete="off"></label>'+ctrDl()+
  '<p class="err" id="ctrErr" hidden>اكتب اسم الحاوية أولاً.</p><div class="acts"><label class="btn acc lg" id="ctrGo2" for="ctrXlIn">متابعة — اختر شيت الحاوية</label></div>');
  setTimeout(function(){var f=document.getElementById('ctrIn');if(f)f.focus()},60)}
-function ctrXlRead(file,name){toast('جارٍ قراءة الشيت…');
+function ctrXlRead(file,name){prog('جارٍ قراءة الشيت وتصنيف الأصناف');
  Promise.all([xlsx(),file.arrayBuffer()]).then(function(r){var X=r[0],wb=X.read(r[1]),ws=wb.Sheets[wb.SheetNames[0]],rows=X.utils.sheet_to_json(ws,{header:1,raw:false,defval:''});
   var hc=-1,hi=-1;for(var i=0;i<Math.min(rows.length,15)&&hc<0;i++)rows[i].forEach(function(c,j){if(hc<0&&HEAD[0][1].indexOf(nrm(c))>=0){hc=j;hi=i}});
   var idx={};D.products.forEach(function(p){idx[nrm(p.code)]=p});var hit={},miss=0;
   rows.slice(hi+1).forEach(function(row){var cells=hc>=0?[row[hc]]:row;var f=null;cells.forEach(function(c){var k=nrm(c);if(!f&&k&&idx[k])f=idx[k]});if(f)hit[f.id]=f;else if(hc>=0&&String(row[hc]||'').trim())miss++});
-  var L=Object.keys(hit).map(function(k){return hit[k]});if(!L.length){toast('لم أجد في الشيت أي رقم صنف موجود في المنظومة.',5000);return}
+  var L=Object.keys(hit).map(function(k){return hit[k]});if(!L.length){progEnd(false,'لا توجد أصناف مطابقة');toast('لم أجد في الشيت أي رقم صنف موجود في المنظومة.',5000);return}
   var F=fb.fs,jobs=[];for(var i2=0;i2<L.length;i2+=400){var b=F.writeBatch(db);L.slice(i2,i2+400).forEach(function(p){b.set(F.doc(db,'products',p.id),{ctr:name},{merge:true});p.ctr=name});jobs.push(b.commit())}
-  return Promise.all(jobs).then(function(){closeSheets();render();toast('🏷️ تم تصنيف '+L.length+' صنف: '+name+(miss?' — و'+miss+' رقم في الشيت غير موجود في المنظومة':''),6000)})
- }).catch(function(e){console.error(e);toast(e&&e.code?permMsg(e):'تعذّرت قراءة الملف. تأكد أنه ملف إكسل.',5000)})}
+  return Promise.all(jobs).then(function(){progEnd(true,'انتهى تصنيف '+L.length+' صنف');closeSheets();render();toast('🏷️ تم تصنيف '+L.length+' صنف: '+name+(miss?' — و'+miss+' رقم في الشيت غير موجود في المنظومة':''),6000)})
+ }).catch(function(e){console.error(e);progEnd(false,'لم يكتمل');toast(e&&e.code?permMsg(e):'تعذّرت قراءة الملف. تأكد أنه ملف إكسل.',5000)})}
 function ctrOld(btn){var inp=document.getElementById('ctrOldIn'),v=inp&&inp.value.trim();if(!v){toast('اكتب اسم التصنيف');if(inp)inp.focus();return}
  var L=D.products.filter(function(p){return !String(p.ctr||'').trim()&&!p.pend});if(!L.length){toast('لا توجد أصناف بدون تصنيف');return}
  btn.disabled=true;var F=fb.fs,jobs=[];for(var i=0;i<L.length;i+=400){var b=F.writeBatch(db);L.slice(i,i+400).forEach(function(p){b.set(F.doc(db,'products',p.id),{ctr:v},{merge:true});p.ctr=v});jobs.push(b.commit())}
@@ -1103,7 +1119,7 @@ function checkAll(){var L=D.products.filter(function(p){return p.images&&p.image
 function saveOne(p){return writeP(p).then(function(){p._dirty=false})}
 var wakeL=null;function wake(on){try{if(on&&navigator.wakeLock&&!wakeL)navigator.wakeLock.request('screen').then(function(w){wakeL=w;w.addEventListener('release',function(){wakeL=null})},function(){});else if(!on&&wakeL){wakeL.release();wakeL=null}}catch(e){}}
 document.addEventListener('visibilitychange',function(){if(document.visibilityState==='visible'&&aiBusy>0)wake(true)});
-function photoBatch(files){aiBusy=files.length;wake(true);render();var made=0,attached=0,failed=0,saved=0,unsaved=0,lastErr=null,chain=Promise.resolve();
+function photoBatch(files){aiBusy=files.length;wake(true);render();var made=0,attached=0,failed=0,saved=0,unsaved=0,lastErr=null,chain=Promise.resolve(),PT=files.length,PD=0;prog('جارٍ تحميل الصور — لا تغلق الصفحة',0,PT);
  function keep(t){return saveOne(t).then(function(){saved++},function(e){console.error(e);unsaved++})}
  files.forEach(function(f){chain=chain.then(function(){var hi=null;return shrink(f).then(function(src){
   var fx=byName(f.name);if(fx&&fx.th&&!fx._full)return getFull(fx).then(function(L){fx.images=L.concat(src);fx._full=true;fx._dirty=true;attached++;return keep(fx)});if(fx){fx.images=(fx.images||[]).concat(src);fx._dirty=true;attached++;return keep(fx)}
@@ -1111,8 +1127,8 @@ function photoBatch(files){aiBusy=files.length;wake(true);render();var made=0,at
    if(ex&&ex.th&&!ex._full)return getFull(ex).then(function(L){ex.images=L.concat(src);ex._full=true;aiApply(ex,r,false);ex._dirty=true;attached++;return keep(ex)});if(ex){ex.images=(ex.images||[]).concat(src);aiApply(ex,r,false);ex._dirty=true;attached++;return keep(ex)}
    else{var np={id:'p'+Date.now().toString(36)+Math.floor(Math.random()*99),code:'صنف جديد',name:'',cat:catName(admCat)?admCat:'',sizes:'',pack:18,_newPack:1,price:0,stock:0,images:[src],order:D.products.length+1,_dirty:true,pend:true};aiApply(np,r,true);D.products.push(np);made++;return keep(np)}
   },function(e){failed++;lastErr=e;var np={id:'p'+Date.now().toString(36)+Math.floor(Math.random()*99),code:'صنف جديد',name:'',cat:catName(admCat)?admCat:'',sizes:'',pack:18,price:0,stock:0,images:[src],order:D.products.length+1,_dirty:true,pend:true};D.products.push(np);return keep(np)})
- }).catch(function(e){console.error(e);failed++;lastErr=e}).then(function(){aiBusy--;render()})})});
- chain.then(function(){aiBusy=0;wake(false);if(D.products.some(function(p){return p.pend}))admCat='pend';render();
+ }).catch(function(e){console.error(e);failed++;lastErr=e}).then(function(){aiBusy--;PD++;prog('جارٍ تحميل الصور — لا تغلق الصفحة',PD,PT);render()})})});
+ chain.then(function(){aiBusy=0;wake(false);progEnd(!unsaved,unsaved?'انتهى — لم تُحفظ '+unsaved+' صورة، اضغط «حفظ الكل»':'انتهى تحميل '+PT+' صورة');if(D.products.some(function(p){return p.pend}))admCat='pend';render();
   toast('تم حفظ '+saved+' صورة ✅ '+(made?'(أصناف جديدة: '+made+') ':'')+(unsaved?'— لم تُحفظ '+unsaved+'، اضغط «حفظ الكل». ':'')+(failed?aiErr(lastErr):'راجع السعر والكمية لكل صنف جديد ثم احفظه.'),7000);
   var d=document.querySelector('.card.dirty');if(d)d.scrollIntoView({block:'center'})})}
 function readCard(p){if(!p.images||!p.images.length){toast('أضف صورة أولاً');return}aiBusy=1;render();
@@ -1123,8 +1139,8 @@ function approveAll(btn){var L=D.products.filter(function(p){return p.pend});if(
  if(btn.dataset.sure!=='1'){btn.dataset.sure='1';btn.textContent=bad?'⚠️ فيه '+bad+' صنف ناقص — اضغط مرة ثانية للاعتماد رغم ذلك':'اضغط مرة ثانية لتأكيد اعتماد '+L.length+' صنف';return}
  btn.disabled=true;btn.textContent='جارٍ الاعتماد…';var F=fb.fs,jobs=[];for(var i=0;i<L.length;i+=400){var b=F.writeBatch(db);var now=Date.now();L.slice(i,i+400).forEach(function(p){p.newAt=now;if(KNOWN[p.id])KNOWN[p.id].newAt=now;b.set(F.doc(db,'products',p.id),{pend:false,newAt:now},{merge:true})});jobs.push(b.commit())}
  Promise.all(jobs).then(function(){L.forEach(function(p){p.pend=false;if(KNOWN[p.id])KNOWN[p.id].pend=false});admCat=D.products.some(function(p){return !catName(p.cat)})?'none':'all';render();scrollTo(0,0);toast('تم اعتماد '+L.length+' صنف ✅ الآن صنّف كل صنف في قسمه',6000)},function(e){console.error(e);btn.disabled=false;btn.dataset.sure='';btn.textContent='✅ اعتماد الدفعة';toast(permMsg(e),5000)})}
-function saveAll(){var L=D.products.filter(function(p){return p._dirty});if(!L.length)return;var big=[],ok=0,err=null;toast('جارٍ الحفظ…');
- Promise.all(L.map(function(p){return saveOne(p).then(function(){ok++},function(e){if(e&&e.big)big.push(p.code);else{console.error(e);err=e}})})).then(function(){render();
+function saveAll(){var L=D.products.filter(function(p){return p._dirty});if(!L.length)return;var big=[],ok=0,err=null,dn=0;prog('جارٍ الحفظ',0,L.length);
+ Promise.all(L.map(function(p){return saveOne(p).then(function(){ok++},function(e){if(e&&e.big)big.push(p.code);else{console.error(e);err=e}}).then(function(){dn++;prog('جارٍ الحفظ',dn,L.length)})})).then(function(){render();progEnd(ok===L.length,ok===L.length?'تم حفظ '+ok+' صنف':'لم يُحفظ '+(L.length-ok)+' صنف');
   toast((ok?'تم حفظ '+ok+' صنف ✅':'')+(big.length?' — صور كبيرة جداً في: '+big.join('، '):'')+(err?' — '+permMsg(err):''),6000)})}
 
 /* ---------- excel import ---------- */
@@ -1134,7 +1150,7 @@ var HEAD=[['code',['رقمالصنف','الكود','كودالصنف','رقما�
 function nrm(x){return String(x||'').toLowerCase().replace(/[\s()\-_:.]/g,'').replace(/[أإآ]/g,'ا').replace(/ة/g,'ه').replace(/ى/g,'ي')}
 function toNum(v){var t=String(v).replace(/[٠-٩]/g,function(c){return '٠١٢٣٤٥٦٧٨٩'.indexOf(c)}).replace(/,/g,'').replace(/[^\d.]/g,'');if(!t)return NaN;return Number(t)}
 function xlTemplate(){xlsx().then(function(X){var ws=X.utils.aoa_to_sheet([['رقم الصنف','اسم الصنف','المقاسات','عبوة الكرتونة','سعر القطعة','الكمية (كراتين)','القسم']].concat(D.products.map(function(p){return [p.code,p.name||'',p.sizes,p.pack,p.price,p.stock,catName(p.cat)]})));ws['!cols']=[{wch:14},{wch:22},{wch:12},{wch:14},{wch:12},{wch:16},{wch:10}];var wb=X.utils.book_new();X.utils.book_append_sheet(wb,ws,'الأصناف');X.writeFile(wb,'أصناف-الوفاء.xlsx')},function(){toast('تعذّر تحميل أداة الإكسل. تأكد من الإنترنت.')})}
-function xlRead(file){toast('جارٍ قراءة الملف…');
+function xlRead(file){prog('جارٍ قراءة ملف الإكسل');
  Promise.all([xlsx(),file.arrayBuffer()]).then(function(r){var X=r[0],wb=X.read(r[1]),ws=wb.Sheets[wb.SheetNames[0]],rows=X.utils.sheet_to_json(ws,{header:1,raw:false,defval:''});
   var hi=-1,map={};for(var i=0;i<Math.min(rows.length,10)&&hi<0;i++){var m={};rows[i].forEach(function(c,j){var k=nrm(c);HEAD.forEach(function(h){if(m[h[0]]==null&&h[1].indexOf(k)>=0)m[h[0]]=j})});if(m.code!=null){hi=i;map=m}}
   if(hi<0){map={code:0,name:1,sizes:2,pack:3,price:4,stock:5,cat:6}}
@@ -1143,7 +1159,7 @@ function xlRead(file){toast('جارٍ قراءة الملف…');
    var d={code:code};var nm=g('name');if(nm)d.name=nm;var sz=g('sizes');if(sz)d.sizes=sz.replace(/\s*[-–]\s*/,'–');var ct=g('cat');if(ct){var ck2=catKey(ct);if(ck2)d.cat=ck2;else badCat++}
    ['pack','price','stock'].forEach(function(k){var v=g(k);if(v!==''){var n=toNum(v);if(isFinite(n))d[k]=k==='price'?n:Math.round(n)}});
    var ex=null;D.products.forEach(function(p){if(String(p.code).toLowerCase()===code.toLowerCase())ex=p});plan.push({d:d,ex:ex})});
-  xlPlan=plan;
+  xlPlan=plan;PB&&PB.remove();PB=null;
   if(!plan.length){toast('لم أجد أصنافاً في الملف. تأكد أن أول عمود هو رقم الصنف.',4500);return}
   var nNew=plan.filter(function(x){return !x.ex}).length;
   sheet('xlS','استيراد من إكسل','<div class="shd"><h2>مراجعة الاستيراد</h2><button class="x" data-close="1" type="button" aria-label="إغلاق">✕</button></div><p class="note">'+plan.length+' صنف: <b>'+nNew+' جديد</b> و<b>'+(plan.length-nNew)+' تحديث</b>'+(bad?' — تم تجاهل '+bad+' سطر بدون رقم صنف':'')+(badCat?' — ⚠️ '+badCat+' صنف القسم المكتوب له غير مفهوم (اكتب: رجالي، نسائي، أولاد، بنات — أو: بلاستيك رجالي، بلاستيك نسائي، بلاستيك أولاد، بلاستيك بنات)':'')+'</p>'+
@@ -1151,11 +1167,11 @@ function xlRead(file){toast('جارٍ قراءة الملف…');
    plan.map(function(x){var d=x.d;return '<tr><td class="num"><b>'+esc(d.code)+'</b></td><td>'+esc(d.name||'')+'</td><td class="c num">'+esc(d.sizes||'')+'</td><td class="c num">'+(d.pack!=null?d.pack:'')+'</td><td class="c num">'+(d.price!=null?d.price:'')+'</td><td class="c num">'+(d.stock!=null?d.stock:'')+'</td><td class="c">'+(d.cat?catName(d.cat):(x.ex?'':'<b style="color:var(--warn)">بدون</b>'))+'</td><td class="c">'+(x.ex?'تحديث':'<b style="color:var(--ok)">جديد</b>')+'</td></tr>'}).join('')+'</tbody></table></div>'+
    '<label class="f">🏷️ تصنيف الحاوية * <small>(يُعطى للأصناف الجديدة في هذا الملف)</small><input id="xlCtr" list="ctrDl" value="'+esc(xlCtr)+'" autocomplete="off"></label>'+ctrDl()+'<p class="err" id="xlErr" hidden>اكتب تصنيف الحاوية قبل الحفظ.</p>'+
     '<div class="acts"><button class="btn acc lg" id="xlGo" type="button">حفظ '+plan.length+' صنف</button><button class="btn ghost" data-close="1" type="button">إلغاء</button></div>');
- }).catch(function(e){console.error(e);toast('تعذّرت قراءة الملف. تأكد أنه ملف إكسل (.xlsx).',4500)})}
+ }).catch(function(e){console.error(e);progEnd(false,'تعذّرت قراءة الملف');toast('تعذّرت قراءة الملف. تأكد أنه ملف إكسل (.xlsx).',4500)})}
 function xlSave(){var xc=document.getElementById('xlCtr'),cv=xc&&xc.value.trim();if(!cv){var xe=document.getElementById('xlErr');if(xe)xe.hidden=false;if(xc)xc.focus();return}xlCtr=cv;var F=fb.fs,b=F.writeBatch(db),ord=D.products.reduce(function(m,p){return Math.max(m,p.order||0)},0),n=0;
  xlPlan.forEach(function(x){var d=x.d;if(x.ex){if(!String(x.ex.ctr||'').trim())d.ctr=cv;b.set(F.doc(db,'products',x.ex.id),d,{merge:true})}else{var nd={ctr:cv,code:d.code,name:d.name||'',cat:d.cat||(catName(admCat)?admCat:''),sizes:d.sizes||'',pack:Math.max(1,d.pack||18),price:d.price||0,stock:Math.max(0,d.stock||0),images:[],order:++ord,pend:true};b.set(F.doc(db,'products','p'+Date.now().toString(36)+(n++)),nd)}});
- var g=document.getElementById('xlGo');if(g){g.disabled=true;g.textContent='جارٍ الحفظ…'}
- var anyNew=xlPlan.some(function(x){return !x.ex});b.commit().then(function(){closeSheets();if(anyNew){admCat='pend';render();scrollTo(0,0)}toast(anyNew?'تم حفظ الأصناف في «الدفعة الجديدة» ✅ أضف الصور ثم اعتمدها':'تم تحديث '+xlPlan.length+' صنف ✅',5000)},function(e){console.error(e);if(g){g.disabled=false;g.textContent='حفظ'}toast(permMsg(e),4500)})}
+ var g=document.getElementById('xlGo');if(g){g.disabled=true;g.textContent='جارٍ الحفظ…'}prog('جارٍ رفع '+xlPlan.length+' صنف إلى المنظومة');
+ var anyNew=xlPlan.some(function(x){return !x.ex});b.commit().then(function(){progEnd(true,'انتهى رفع '+xlPlan.length+' صنف');closeSheets();if(anyNew){admCat='pend';render();scrollTo(0,0)}toast(anyNew?'تم حفظ الأصناف في «الدفعة الجديدة» ✅ أضف الصور ثم اعتمدها':'تم تحديث '+xlPlan.length+' صنف ✅',5000)},function(e){console.error(e);progEnd(false,'لم يكتمل الرفع');if(g){g.disabled=false;g.textContent='حفظ'}toast(permMsg(e),4500)})}
 function onProducts(s0){
   var s={docs:s0.docs.filter(function(d){return d.id.charAt(0)!=='_'})};s.empty=!s.docs.length;
   s.docs.forEach(function(d){var x=d.data();x.id=d.id;KNOWN[d.id]=x});
