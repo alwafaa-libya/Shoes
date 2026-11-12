@@ -1,4 +1,4 @@
-<!doctype html><!-- v2026-11-12a --><html lang="ar"><head><meta charset="utf-8">
+<!doctype html><!-- v2026-11-12b --><html lang="ar"><head><meta charset="utf-8">
 <meta name="description" content="أحذية بالجملة — تصفّح الأصناف واطلب بالكرتونة مباشرة">
 <meta property="og:type" content="website">
 <meta property="og:url" content="https://alwafaa-libya.github.io/Shoes/">
@@ -920,7 +920,7 @@ function renderAdmin(){
    h+='<div class="pendbox"><div><b>📥 دفعة جديدة قيد المراجعة: <span class="num">'+acn.pend+'</span> صنف</b><span>هذه الأصناف منفصلة عن أصنافك السابقة ولا تظهر للزبائن حتى تعتمدها. راجعها واربط الصور، ثم اضغط «اعتماد». بعد الاعتماد تنضم للأصناف وتصنّف كل صنف في قسمه.</span>'+(pNo||pOr?'<span class="pw">'+(pNo?'⚠️ '+pNo+' صنف بدون صورة. ':'')+(pOr?'⚠️ '+pOr+' صورة غير مربوطة بصنف.':'')+'</span>':'<span class="pk">✅ كل الأصناف فيها صور</span>')+'</div><div class="xbtns">'+(admCat!=='pend'?'<button class="btn ghost" data-admcat="pend" type="button">عرض الدفعة</button>':'')+'<button class="scan" id="approve" type="button">✅ اعتماد الدفعة</button></div></div>'}
   h+='<div class="grid"><div class="catset" style="display:block"><b>📂 الأقسام</b>'+(acn.none?' <span style="color:var(--warn);font-weight:700;display:inline">— '+acn.none+' صنف بدون قسم لا يظهر للزبائن</span>':'')+catTabs(admCat,'admcat',acn).replace('margin:0 0 16px','')+ctrTabs()+'<button class="btn ghost" id="xlView" type="button" style="margin-top:8px">📥 تنزيل شيت إكسل لأصناف '+esc(viewName())+'</button></div>';
   var AL=D.products.filter(function(p){return inCat(p,admCat)&&(!chkOnly||p._dirty||(chk[p.id]&&chk[p.id].s!=='ok'))});
-  if(AL.length&&D.fromDb)h+='<div class="catset"><span>نقل كل الأصناف المعروضة الآن ('+AL.length+' صنف) إلى قسم واحد دفعة واحدة:</span><select id="bulkCat"><option value="">— اختر القسم —</option>'+catOpts('')+'</select><button class="btn acc" id="bulkGo" type="button">تطبيق</button><span>أو إخفاء / إظهار كل هذه الأصناف للزبائن:</span><button class="btn ghost" id="bulkHide" type="button">🚫 إخفاء الكل</button><button class="btn ghost" id="bulkShow" type="button">👁️ إظهار الكل</button><span>🏷️ تصنيف الحاوية: اكتب تصنيفاً جديداً أو اختر من القائمة</span><input id="bulkCtrIn" class="msearch" list="ctrDl" placeholder="مثال: TAHER641" autocomplete="off"><button class="btn ghost" id="ctrAdd" type="button">➕ إضافة التصنيف للقائمة فقط</button><button class="btn acc" id="bulkCtr" type="button">إعطاء هذا التصنيف للأصناف المعروضة ('+AL.length+')</button></div>';
+  if(AL.length&&D.fromDb)h+='<div class="catset">'+(String(admCat).indexOf('ctr:')===0?'<span>✏️ تغيير اسم التصنيف «'+esc(admCat.slice(4))+'» — يتغير في كل أصنافه ('+AL.length+') دفعة واحدة:</span><input id="ctrRenIn" class="msearch" placeholder="الاسم الجديد للتصنيف" autocomplete="off"><button class="btn acc" id="ctrRenGo" type="button">تغيير اسم التصنيف</button><hr style="width:100%;border:0;border-top:1px dashed var(--line);margin:6px 0">':'')+'<span>نقل كل الأصناف المعروضة الآن ('+AL.length+' صنف) إلى قسم واحد دفعة واحدة:</span><select id="bulkCat"><option value="">— اختر القسم —</option>'+catOpts('')+'</select><button class="btn acc" id="bulkGo" type="button">تطبيق</button><span>أو إخفاء / إظهار كل هذه الأصناف للزبائن:</span><button class="btn ghost" id="bulkHide" type="button">🚫 إخفاء الكل</button><button class="btn ghost" id="bulkShow" type="button">👁️ إظهار الكل</button><span>🏷️ تصنيف الحاوية: اكتب تصنيفاً جديداً أو اختر من القائمة</span><input id="bulkCtrIn" class="msearch" list="ctrDl" placeholder="مثال: TAHER641" autocomplete="off"><button class="btn ghost" id="ctrAdd" type="button">➕ إضافة التصنيف للقائمة فقط</button><button class="btn acc" id="bulkCtr" type="button">إعطاء هذا التصنيف للأصناف المعروضة ('+AL.length+')</button></div>';
   h+=AL.map(editCard).join('')+'<button class="newcard" id="addProd" type="button">+ صنف جديد'+(catName(admCat)?' في قسم '+catName(admCat):'')+'</button></div>';
   h+='<p class="note">كل صنف يُحفظ بزر «حفظ» الخاص به، ويظهر التعديل للزبائن فوراً.</p>';
  }
@@ -1216,6 +1216,15 @@ function ctrAdd(btn,fid){var inp=document.getElementById(fid||'bulkCtrIn'),v=inp
  if(ctrList().indexOf(v)>=0){toast('التصنيف «'+v+'» موجود في القائمة');return}
  var L=((SITE&&SITE.ctrs)||[]).concat([v]);btn.disabled=true;var F=fb.fs;
  F.setDoc(F.doc(db,'products','_site'),{ctrs:L},{merge:true}).then(function(){SITE.ctrs=L;render();toast('🏷️ أُضيف التصنيف «'+v+'» — تجده الآن في القوائم',4000)},function(e){console.error(e);btn.disabled=false;toast(permMsg(e),4500)})}
+function ctrRen(btn){var old=String(admCat).slice(4),inp=document.getElementById('ctrRenIn'),v=inp&&inp.value.trim();
+ if(!v){toast('اكتب الاسم الجديد للتصنيف');if(inp)inp.focus();return}if(v===old){toast('الاسم الجديد مثل القديم');return}
+ var L=D.products.filter(function(p){return String(p.ctr||'').trim()===old});
+ if(btn.dataset.sure!==v){btn.dataset.sure=v;btn.textContent='متأكد؟ تغيير «'+old+'» إلى «'+v+'» في '+L.length+' صنف';return}
+ btn.disabled=true;btn.textContent='جارٍ الحفظ…';var F=fb.fs,jobs=[];
+ for(var i=0;i<L.length;i+=400){var b=F.writeBatch(db);L.slice(i,i+400).forEach(function(p){b.set(F.doc(db,'products',p.id),{ctr:v},{merge:true});p.ctr=v});jobs.push(b.commit())}
+ var C=((SITE&&SITE.ctrs)||[]).filter(function(c){return c!==old});if(C.indexOf(v)<0&&((SITE&&SITE.ctrs)||[]).indexOf(old)>=0)C.push(v);
+ jobs.push(F.setDoc(F.doc(db,'products','_site'),{ctrs:C},{merge:true}));
+ Promise.all(jobs).then(function(){SITE.ctrs=C;admCat='ctr:'+v;render();toast('✏️ تم تغيير التصنيف «'+old+'» إلى «'+v+'» في '+L.length+' صنف',4500)},function(e){console.error(e);btn.disabled=false;btn.textContent='تغيير اسم التصنيف';toast(permMsg(e),4500)})}
 function bulkCtr(btn){var inp=document.getElementById('bulkCtrIn'),v=inp&&inp.value.trim();if(!v){toast('اكتب أو اختر التصنيف أولاً');if(inp)inp.focus();return}
  var L=D.products.filter(function(p){return inCat(p,admCat)&&(!chkOnly||p._dirty||(chk[p.id]&&chk[p.id].s!=='ok'))});if(!L.length)return;
  if(btn.dataset.sure!==v){btn.dataset.sure=v;btn.textContent='متأكد؟ تصنيف '+L.length+' صنف «'+v+'»';return}
@@ -1321,6 +1330,7 @@ document.addEventListener('click',function(e){
  if(t.id==='ctrOldGo'){ctrOld(t);return}
  if(t.id==='ctrAdd'){ctrAdd(t);return}
  if(t.id==='ctrNewGo'){ctrAdd(t,'ctrNewIn');return}
+ if(t.id==='ctrRenGo'){ctrRen(t);return}
  if(t.id==='bulkCtr'){bulkCtr(t);return}
  if(t.id==='ctrXl'){ctrXlAsk();return}
  if(t.id==='mAdd'&&man){manAdd();return}
