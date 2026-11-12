@@ -329,7 +329,7 @@ function catKey(v){var t=String(v||'').trim().toLowerCase().replace(/[أإآ]/g,
  if(/^(men|man|male|رجالي|رجال|رجل|رجالى)$/.test(t))return 'men';if(/^(women|woman|ladies|lady|نسائي|نساء|نسواني|حريمي|حريم|ستاتي)$/.test(t))return 'women';
  if(/^(boys|boy|kidsboys|اولاد|ولادي|ولد|صبياني|اطفالاولاد)$/.test(t))return 'boys';if(/^(girls|girl|بنات|بناتي|بنت|اطفالبنات)$/.test(t))return 'girls';
  for(var i=0;i<ALLCATS.length;i++)if(ALLCATS[i][0]===t)return t;return ''}
-var custCat='';try{custCat=localStorage.getItem('wf_cat')||''}catch(e){}if(!catName(custCat)&&custCat!=='plastic')custCat='';
+var custCat='all';
 var KNOWN={},unsubProd=null,prodMode='',catLive=false,admCat='auto',pvCat='all';
 
 function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]})}
@@ -399,10 +399,10 @@ function render(){
  if(custCat==='plastic'){
   h+='<h2 class="brand" style="font-size:1.2rem;text-align:center;margin:4px 0">قسم البلاستيك — اختر</h2><div class="cpick">'+PCATS.map(function(c){return '<button type="button" data-cat="'+c[0]+'"><span>'+c[2]+'</span>'+c[3]+'</button>'}).join('')+'</div>';
  }else if(custCat){
-  if(!catLive&&!dbErr)h+='<p class="note live">جارٍ تحميل أصناف قسم '+catName(custCat)+'…</p>';
+  var cnm=custCat==='all'?'':' قسم '+catName(custCat);if(!catLive&&!dbErr)h+='<p class="note live">جارٍ تحميل الأصناف'+cnm+'…</p>';
   h+='<div class="grid">';
-  var shown=D.products.filter(function(p){return av(p)>0&&p.price>0&&!p.hidden&&!p.pend&&p.cat===custCat});
-  if(catLive&&!shown.length)h+='<p class="empty">لا توجد أصناف في قسم '+catName(custCat)+(custLoc?' في فرع '+locName(custLoc):'')+' حالياً. جرّب قسماً آخر'+(custLoc?' أو فرعاً آخر':'')+'.</p>';
+  var shown=D.products.filter(function(p){return av(p)>0&&p.price>0&&!p.hidden&&!p.pend&&(custCat==='all'?!!catName(p.cat):p.cat===custCat)});
+  if(catLive&&!shown.length)h+='<p class="empty">لا توجد أصناف'+(custCat==='all'?' متوفرة':' في قسم '+catName(custCat))+(custLoc?' في فرع '+locName(custLoc):'')+' حالياً. جرّب قسماً آخر'+(custLoc?' أو فرعاً آخر':'')+'.</p>';
   shown.forEach(function(p){h+=shopCard(p)});
   h+='</div>';
  }
@@ -423,7 +423,7 @@ function newsMark(cat){NEWS.forEach(function(p){if(!cat||p.cat===cat)newsSeen[p.
 function loadNews(){if(newsAsked||isAdminUrl||!fb||!db)return;newsAsked=true;var F=fb.fs;
  F.getDocs(F.query(F.collection(db,'products'),F.where('newAt','>',Date.now()-NEWDAYS*864e5))).then(function(s){NEWS=s.docs.map(function(d){var x=d.data();return {id:d.id,cat:x.cat,newAt:x.newAt,hidden:x.hidden,pend:x.pend,stock:x.stock,bs:x.bs,price:x.price}});if(!document.querySelector('.sheet'))render()},function(e){console.warn('news',e)})}
 function custTabs(cur){var pl=isPl(cur),main=pl?'plastic':cur;
- var h='<div class="ctabs main" role="tablist">'+CATS.concat([['plastic','بلاستيك']]).map(function(c){return '<button class="ctab'+(main===c[0]?' on':'')+'" data-cat="'+c[0]+'" type="button" role="tab" aria-selected="'+(main===c[0])+'">'+c[1]+'</button>'}).join('')+'</div>';
+ var h='<div class="ctabs main" role="tablist">'+[['all','الكل']].concat(CATS).concat([['plastic','بلاستيك']]).map(function(c){return '<button class="ctab'+(main===c[0]?' on':'')+'" data-cat="'+c[0]+'" type="button" role="tab" aria-selected="'+(main===c[0])+'">'+c[1]+'</button>'}).join('')+'</div>';
  if(pl&&cur!=='plastic')h+='<div class="ctabs sub" role="tablist">'+PCATS.map(function(c){return '<button class="ctab'+(cur===c[0]?' on':'')+'" data-cat="'+c[0]+'" type="button" role="tab" aria-selected="'+(cur===c[0])+'">'+c[3]+'</button>'}).join('')+'</div>';
  return h}
 function catTabs(cur,attr,counts){if(counts){var pl=isPl(cur);counts.plastic=PCATS.reduce(function(n,c){return n+(counts[c[0]]||0)},0);
@@ -1201,7 +1201,7 @@ function onProducts(s0){
   if(!editing()&&!document.querySelector('.sheet'))render();
   else if(document.getElementById('cartS'))openCart();
 }
-function subProducts(){if(!fb||!db||storeMode)return;loadNews();var F=fb.fs,want=isAdminUrl?'all':(custCat&&custCat!=='plastic'?'c:'+custCat:'');
+function subProducts(){if(!fb||!db||storeMode)return;loadNews();var F=fb.fs,want=isAdminUrl||custCat==='all'?'all':(custCat&&custCat!=='plastic'?'c:'+custCat:'');
  if(want===prodMode)return;prodMode=want;if(unsubProd){unsubProd();unsubProd=null}
  D.products=D.products.filter(function(p){return p._dirty});catLive=false;
  if(!want){live=true;render();return}
@@ -1211,7 +1211,7 @@ function bulkHide(btn,h){var L=D.products.filter(function(p){return inCat(p,admC
  if(!btn.dataset.sure){btn.dataset.sure='1';btn.textContent='متأكد؟ '+(h?'إخفاء ':'إظهار ')+L.length+' صنف';return}
  btn.disabled=true;var F=fb.fs,jobs=[];for(var i=0;i<L.length;i+=400){var b=F.writeBatch(db);L.slice(i,i+400).forEach(function(p){b.set(F.doc(db,'products',p.id),{hidden:h},{merge:true});p.hidden=h});jobs.push(b.commit())}
  Promise.all(jobs).then(function(){render();toast((h?'🚫 تم إخفاء ':'👁️ تم إظهار ')+L.length+' صنف',4000)},function(e){console.error(e);btn.disabled=false;toast(permMsg(e),4500)})}
-function setCat(c){if(!catName(c)&&c!=='plastic')return;if(catName(c)&&NEWS.length)newsMark(c);custCat=c;try{localStorage.setItem('wf_cat',c)}catch(e){}subProducts();render();scrollTo(0,0)}
+function setCat(c){if(!catName(c)&&c!=='plastic'&&c!=='all')return;if(catName(c)&&NEWS.length)newsMark(c);custCat=c;try{localStorage.setItem('wf_cat',c)}catch(e){}subProducts();render();scrollTo(0,0)}
 function ctrAdd(btn,fid){var inp=document.getElementById(fid||'bulkCtrIn'),v=inp&&inp.value.trim();if(!v){toast('اكتب اسم التصنيف أولاً');if(inp)inp.focus();return}
  if(ctrList().indexOf(v)>=0){toast('التصنيف «'+v+'» موجود في القائمة');return}
  var L=((SITE&&SITE.ctrs)||[]).concat([v]);btn.disabled=true;var F=fb.fs;
