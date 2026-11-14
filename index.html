@@ -804,11 +804,18 @@ function cancelManual(id){var o=orders.filter(function(x){return x.id===id})[0];
 
 /* ---------- import transfer invoice (photo / PDF / Excel) ---------- */
 var TRQ='هذه فاتورة نقل بضاعة بين المخازن من برنامج محاسبة عربي (صورة أو PDF). استخرج كل سطور الأصناف من الجدول فقط. لكل سطر: رقم الصنف (عمود رقم الصنف / Item_no)، واسم الصنف كما هو مكتوب حرفياً بكل الرموز (عمود اسم الصنف / item_name)، والكمية (عمود الكمية / Qty). تجاهل السعر والإجمالي ورأس الفاتورة. أعد JSON فقط بهذا الشكل: {"items":[{"no":"27575","name":"HH6830 30-35","qty":2}]}';
-function aiAsk(ask,b64,mime){return aiReady().then(function(A){
- function attempt(){var model=A.mod.getGenerativeModel(A.ai,{model:MODELS[A.i],generationConfig:{responseMimeType:'application/json',temperature:0}});
+function aiAsk(ask,b64,mime){return aiReady().then(function(A){return aiGen(A,ask,b64,mime)})}
+function aiSt(e){var d=e&&e.customErrorData||{};return +(d.status||0)||+((String(e&&e.message||'').match(/\[(\d{3})/)||[])[1]||0)}
+function aiGen(A,ask,b64,mime){var tries=0,i=A.i;
+ function attempt(){var model=A.mod.getGenerativeModel(A.ai,{model:MODELS[i],generationConfig:{responseMimeType:'application/json',temperature:0}},{timeout:150000});
   return model.generateContent([ask,{inlineData:{data:b64,mimeType:mime}}]).then(function(r){var t=r.response.text().trim().replace(/^```(json)?/,'').replace(/```$/,'');return JSON.parse(t)},
-   function(e){var msg=String(e&&e.message||e);if(A.i<MODELS.length-1&&/not.?found|404|not supported|unsupported|model/i.test(msg)){A.i++;return attempt()}throw e})}
- return attempt()})}
+   function(e){var msg=String(e&&e.message||e),st=aiSt(e);
+    if(i<MODELS.length-1&&(st===404||/not.?found|not supported|unsupported/i.test(msg))){i++;A.i=i;tries=0;return attempt()}
+    if(st>=500||/overloaded|unavailable|deadline|internal/i.test(msg)){tries++;
+     if(tries<=2)return new Promise(function(r){setTimeout(r,4000*tries)}).then(attempt);
+     if(i<MODELS.length-1){i++;tries=0;return attempt()}}
+    throw e})}
+ return attempt()}
 function fileB64(file,maxPx){return new Promise(function(res,rej){var r=new FileReader();r.onerror=rej;r.onload=function(){var u=r.result;
  if(!/^data:image\//.test(u)||!maxPx){res(u);return}
  var im=new Image();im.onload=function(){var s=Math.min(1,maxPx/Math.max(im.width,im.height));if(s>=1){res(u);return}var c=document.createElement('canvas');c.width=Math.round(im.width*s);c.height=Math.round(im.height*s);c.getContext('2d').drawImage(im,0,0,c.width,c.height);res(c.toDataURL('image/jpeg',0.9))};im.onerror=function(){res(u)};im.src=u};r.readAsDataURL(file)})}
@@ -835,7 +842,7 @@ function manImport(file){if(!man)manNew();var nm=(file.name||'').toLowerCase(),i
   }).catch(function(e){console.error(e);manImpMsg('تعذّرت قراءة ملف الإكسل.')});return}
  if(!fbApp){manImpMsg('انتظر حتى يتصل النظام بالإنترنت ثم حاول مرة أخرى.');return}
  manImpMsg('⏳ جارٍ قراءة الفاتورة… (قد تأخذ حتى دقيقة)',1);
- fileB64(file,2200).then(function(u){var mime=(u.match(/^data:(.*?);/)||[])[1]||'image/jpeg';if(!/^image\/|pdf/.test(mime)){manImpMsg('نوع الملف غير مدعوم. اختر صورة أو PDF أو إكسل.');return}
+ fileB64(file,2200).then(function(u){var mime=(u.match(/^data:(.*?);/)||[])[1]||'image/jpeg';if(!/^image\/|pdf/.test(mime)){manImpMsg('نوع الملف غير مدعوم. اختر صورة أو PDF أو إكسل.');return}if(u.length>18e6){manImpMsg('الملف كبير جداً للقراءة. صوّر الفاتورة صورة عادية أو اختر PDF أصغر.');return}
   return aiAsk(TRQ,u.split(',')[1],mime).then(function(r){impBuild(r&&r.items||(Array.isArray(r)?r:[]))})})
  .catch(function(e){manImpMsg(aiErr(e).replace('تعذّرت قراءة الصورة. اكتب البيانات يدوياً.','تعذّرت قراءة الفاتورة. أضف الأصناف بالبحث.'))})}
 function manDrawImp(){var el=document.getElementById('mImp');if(!el||!man||!man.imp)return;var I=man.imp,ok=I.filter(function(x){return x.p&&x.q>0}),miss=I.filter(function(x){return !x.p}),tq=ok.reduce(function(s,x){return s+x.q},0);
@@ -1104,13 +1111,17 @@ function aiReady(){if(aiP)return aiP;
   return {ai:ai,mod:m[1],i:0};
  });aiP.catch(function(){aiP=null});return aiP}
 function aiRead(dataUrl){var b64=dataUrl.split(',')[1],mime=(dataUrl.match(/^data:(.*?);/)||[])[1]||'image/jpeg';
- return aiReady().then(function(A){
-  function attempt(){var model=A.mod.getGenerativeModel(A.ai,{model:MODELS[A.i],generationConfig:{responseMimeType:'application/json',temperature:0}});
-   return model.generateContent([AIASK,{inlineData:{data:b64,mimeType:mime}}]).then(function(r){var t=r.response.text().trim().replace(/^```(json)?/,'').replace(/```$/,'');return JSON.parse(t)},
-    function(e){var msg=String(e&&e.message||e);if(A.i<MODELS.length-1&&/not.?found|404|not supported|unsupported|model/i.test(msg)){A.i++;return attempt()}throw e})}
-  return attempt()})}
-function aiErr(e){var m=String(e&&(e.code||e.message)||e);console.error(e);
- return /app.?check|appCheck|recaptcha/i.test(m)?'الحماية (App Check) رفضت الطلب. تأكد أن المفتاح محفوظ في Firebase، وانتظر 10 دقائق ثم أعد المحاولة.':/quota|429|exhausted/i.test(m)?'وصلت للحد المجاني لهذا اليوم/الدقيقة. انتظر قليلاً ثم أعد المحاولة.':/network|fetch|Failed to fetch/i.test(m)?'تأكد من الإنترنت ثم أعد المحاولة.':'تعذّرت قراءة الصورة. اكتب البيانات يدوياً. ('+m.slice(0,80)+')'}
+ return aiReady().then(function(A){return aiGen(A,AIASK,b64,mime)})}
+function aiErr(e){var c=String(e&&e.code||''),msg=String(e&&e.message||e||''),m=c+' '+msg,st=aiSt(e);console.error(e);
+ var det=' ('+(st?st+' ':'')+msg.replace(/^AI:\s*/,'').replace(/Error fetching from \S+:?\s*/,'').slice(0,90)+')';
+ if(/app.?check|recaptcha/i.test(m))return 'الحماية (App Check) رفضت الطلب. تأكد أن المفتاح محفوظ في Firebase، وانتظر 10 دقائق ثم أعد المحاولة.';
+ if(st===429||/quota|exhausted/i.test(m))return 'وصلت للحد المجاني لقراءة الصور لهذا اليوم/الدقيقة. انتظر قليلاً ثم أعد المحاولة.';
+ if(st>=500||/overloaded|unavailable/i.test(m))return 'خدمة القراءة الآلية (Google) مشغولة الآن وليست المشكلة من الإنترنت عندك. انتظر دقيقة أو دقيقتين ثم أعد المحاولة.'+det;
+ if(/timeout|timed out|abort/i.test(m))return 'استغرقت القراءة وقتاً طويلاً فتوقفت. جرّب صورة أوضح أو صفحة واحدة، أو أعد المحاولة.';
+ if(st===413||/too large|payload|request size/i.test(m))return 'الملف كبير جداً للقراءة. صوّر الفاتورة صورة عادية أو اختر PDF أصغر.';
+ if(st===403||/api-not-enabled|permission|SERVICE_DISABLED/i.test(m))return 'خدمة القراءة الآلية غير مفعّلة أو مرفوضة في Firebase.'+det;
+ if(!st&&/Failed to fetch|Load failed|NetworkError|network/i.test(m))return 'تأكد من الإنترنت ثم أعد المحاولة.';
+ return 'تعذّرت قراءة الصورة. اكتب البيانات يدوياً.'+det}
 function aiApply(p,r,force){var got=0;if(!r)return 0;
  var code=r.code?String(r.code).trim():'';if(code&&(force||!p.code||p.code==='صنف جديد')){p.code=code;got++}
  var sz=r.sizes?String(r.sizes).replace(/\s*[-–]\s*/,'–').trim():'';if(sz&&(force||!p.sizes)){p.sizes=sz;got++}
