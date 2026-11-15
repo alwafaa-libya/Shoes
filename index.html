@@ -176,6 +176,7 @@ label.f input,label.f textarea{border:1.5px solid var(--line);border-radius:10px
 .ptot .grand span{color:var(--bg);opacity:.8;font-size:.9rem}
 .ptot .grand b{font-size:1.25rem}
 .pfoot{margin:10px 0 0;font-size:.78rem;color:var(--muted);text-align:center}
+.wach{display:flex;align-items:center;justify-content:center;gap:8px;margin:10px 0;padding:11px 14px;border-radius:14px;background:#25D366;color:#fff;font-weight:700;font-size:.95rem;text-decoration:none;box-shadow:0 2px 8px rgba(37,211,102,.35)}.wach small{display:block;font-weight:400;font-size:.75rem;opacity:.95}
 .wa.off,.wa2.off{opacity:.55}
 .invimg.pdfbtn{background:#2e1838;color:#fff}
 .invimg{display:block;width:100%;margin:10px 0 0;background:var(--ok);color:#fff;border:0;font-weight:700;padding:11px;border-radius:12px;font-size:.95rem}
@@ -387,9 +388,10 @@ function render(){
  h+='</header>';
  if(SITE.closed)h+='<p class="note live" style="background:#fdecea;color:#b3261e;font-weight:700">🔒 الموقع مغلق الآن للزبائن (وضع التطوير). أنت تراه لأنك المدير.</p>';
  if(locSet&&custLoc)loadBri(custLoc);
- if(!locSet){h+=locPick()+'<p class="pfoot">للاستفسار واتساب: <span class="num">+'+waOf(D.phone)+'</span></p></div>';app.innerHTML=h;return}
+ if(!locSet){h+=locPick()+chBtn()+'<p class="pfoot">للاستفسار واتساب: <span class="num">+'+waOf(D.phone)+'</span></p></div>';app.innerHTML=h;return}
  h+=locBar();
  h+=newsBar();
+ h+=chBtn();
  if(dbErr)h+='<p class="note live">⚠️ تعذّر الاتصال بالمخزون المباشر. تأكد من الإنترنت ثم حدّث الصفحة.</p>';
  if(!custCat){
   h+='<h2 class="brand" style="font-size:1.3rem;text-align:center;margin:8px 0 4px">اختر القسم</h2><div class="cpick">'+CATS.concat([['plastic','بلاستيك',plImg('plastic')]]).map(function(c){return '<button type="button" data-cat="'+c[0]+'"><span>'+c[2]+'</span>'+c[1]+'</button>'}).join('')+'</div>';
@@ -416,6 +418,8 @@ function catOpts(sel){var o=function(c,t){return '<option value="'+c[0]+'"'+(sel
 var NEWDAYS=14,NEWS=[],newsAsked=false,newsSeen={};try{newsSeen=JSON.parse(localStorage.getItem('wf_seen_new')||'{}')}catch(e){}
 function isNew(p){return !!p.newAt&&Date.now()-p.newAt<NEWDAYS*864e5}
 function newsVis(){return NEWS.filter(function(p){return isNew(p)&&!newsSeen[p.id]&&catName(p.cat)&&!p.hidden&&!p.pend&&av(p)>0&&p.price>0})}
+var WA_CH='https://whatsapp.com/channel/0029Vb96aPmBVJlCKGOF491W';
+function chBtn(){return '<a class="wach" href="'+WA_CH+'" target="_blank" rel="noopener">📢 <span>تابع قناتنا على واتساب<small>ليصلك إشعار فور وصول بضاعة جديدة</small></span></a>'}
 function newsBar(){var L=newsVis();try{if(navigator.setAppBadge){if(L.length)navigator.setAppBadge(L.length);else navigator.clearAppBadge()}}catch(e){}
  if(!L.length)return '';var by={};L.forEach(function(p){by[p.cat]=(by[p.cat]||0)+1});
  return '<div class="newsbar" role="status"><button class="nx" type="button" data-newsx="1" aria-label="إخفاء">✕</button><b>🆕 وصلت بضاعة جديدة: <span class="num">'+L.length+'</span> صنف</b><div class="nb">'+ALLCATS.filter(function(c){return by[c[0]]}).map(function(c){return '<button type="button" data-newscat="'+c[0]+'">'+c[1]+' <span class="num">('+by[c[0]]+')</span></button>'}).join('')+'</div></div>'}
