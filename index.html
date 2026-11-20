@@ -1107,6 +1107,7 @@ var SITE_KEY='6LcGwAYuAAAAAPq6Ali2RO7mZ9UkjftpyTr1ZEU7',MODELS=['gemini-3.8-flas
 var AIASK='هذه صورة إعلان لموديل أحذية لمحل جملة. اقرأ فقط النص المكتوب فعلاً على الصورة (عادة 3 أسطر قرب الشعار: رقم الموديل، ثم مدى المقاسات، ثم عدد الأزواج في الكرتونة مثل 15PRS). '+
 'أعد JSON فقط بهذا الشكل: {"code":string|null,"sizes":string|null,"pack":number|null,"name":string|null}. '+
 'code = رقم الموديل كما هو حرفياً (مثل WM25822-203 أو YT-F37). sizes = مدى المقاسات بصيغة "43-47". pack = الرقم قبل PRS. name = أي اسم أو وصف للصنف مكتوب بالعربي على الصورة إن وجد، وإلا null. '+
+'مهم: إذا بدأ سطر رقم الموديل بـ TS ثم رقم (مثل TS10 T1-13 أو TS9 2607T6-5) فهذا جزء من رقم الصنف وليس شعاراً: أعد السطر كاملاً كما هو مع TS ورقمها والمسافة والشرطة. '+
 'لا تخمّن: إذا لم يظهر الحقل بوضوح ضع null. لا تعتبر اسم الماركة على الحائط (مثل BRQ) رقماً للموديل.';
 function aiReady(){if(aiP)return aiP;
  aiP=Promise.all([import(G+'firebase-app-check.js'),import(G+'firebase-ai.js')]).then(function(m){
@@ -1134,8 +1135,9 @@ function aiApply(p,r,force){var got=0;if(!r)return 0;
  if(got)p._dirty=true;return got}
 function ckey(x){return String(x||'').toLowerCase().replace(/[^a-z0-9]/g,'')}
 function findCode(code){var c=ckey(code),hit=null;if(!c)return null;D.products.forEach(function(p){if(!hit&&ckey(p.code)===c)hit=p});return hit}
+function findTail(code){var c=ckey(String(code||'').replace(/^\s*ts\s*\d+\s*/i,''));if(c.length<2)return null;var L=D.products.filter(function(p){if(p.code==='صنف جديد')return false;var pc=String(p.code||''),t=pc.trim().split(/\s+/);return ckey(t[t.length-1])===c||ckey(pc.replace(/^\s*ts\s*\d+\s*/i,''))===c||(p.ctr&&ckey(pc)===ckey(p.ctr)+c)});if(L.length===1)return L[0];var E=L.filter(function(p){return !(p.images&&p.images.length)});return E.length===1?E[0]:null}
 function findLoose(code){var c=ckey(code);if(c.length<5)return null;var L=D.products.filter(function(p){return p.code!=='صنف جديد'&&(codeMatch(c,p.code)||codeMatch(c,p.name))});if(L.length===1)return L[0];var E=L.filter(function(p){return !(p.images&&p.images.length)});return E.length===1?E[0]:null}
-function byName(n){var b=String(n||'').replace(/\.[^.]+$/,'').trim(),b2=b.replace(/(\s*\(\d+\)|[\s_]+\d{1,2})$/,'');return findCode(b)||findCode(b2)||findLoose(b2)}
+function byName(n){var b=String(n||'').replace(/\.[^.]+$/,'').trim(),b2=b.replace(/(\s*\(\d+\)|[\s_]+\d{1,2})$/,'');return findCode(b)||findCode(b2)||findTail(b2)||findLoose(b2)}
 var chk={},chkBusy=0,chkOnly=false;
 function chkSum(){var r={t:0,ok:0,bad:0,none:0};for(var k in chk){if(!find(k))continue;r.t++;r[chk[k].s==='ok'?'ok':chk[k].s==='bad'?'bad':'none']++}return r}
 function codeMatch(a,b){a=ckey(a);b=ckey(b);return !!a&&!!b&&(a===b||(a.length>=5&&b.length>=5&&(a.indexOf(b)>=0||b.indexOf(a)>=0)))}
@@ -1154,7 +1156,7 @@ function photoBatch(files){aiBusy=files.length;wake(true);render();var made=0,at
  function keep(t){return saveOne(t).then(function(){saved++},function(e){console.error(e);unsaved++})}
  files.forEach(function(f){chain=chain.then(function(){var hi=null;return shrink(f).then(function(src){
   var fx=byName(f.name);if(fx&&fx.th&&!fx._full)return getFull(fx).then(function(L){fx.images=L.concat(src);fx._full=true;fx._dirty=true;attached++;return keep(fx)});if(fx){fx.images=(fx.images||[]).concat(src);fx._dirty=true;attached++;return keep(fx)}
-  return shrink(f,1800,0.88).then(function(h){return aiRead(h)},function(){return aiRead(src)}).then(function(r){var ex=findCode(r&&r.code)||findLoose(r&&r.code);
+  return shrink(f,1800,0.88).then(function(h){return aiRead(h)},function(){return aiRead(src)}).then(function(r){var ex=findCode(r&&r.code)||findTail(r&&r.code)||findLoose(r&&r.code);
    if(ex&&ex.th&&!ex._full)return getFull(ex).then(function(L){ex.images=L.concat(src);ex._full=true;aiApply(ex,r,false);ex._dirty=true;attached++;return keep(ex)});if(ex){ex.images=(ex.images||[]).concat(src);aiApply(ex,r,false);ex._dirty=true;attached++;return keep(ex)}
    else{var np={id:'p'+Date.now().toString(36)+Math.floor(Math.random()*99),code:'صنف جديد',name:'',cat:catName(admCat)?admCat:'',sizes:'',pack:18,_newPack:1,price:0,stock:0,images:[src],order:D.products.length+1,_dirty:true,pend:true};aiApply(np,r,true);D.products.push(np);made++;return keep(np)}
   },function(e){failed++;lastErr=e;var np={id:'p'+Date.now().toString(36)+Math.floor(Math.random()*99),code:'صنف جديد',name:'',cat:catName(admCat)?admCat:'',sizes:'',pack:18,price:0,stock:0,images:[src],order:D.products.length+1,_dirty:true,pend:true};D.products.push(np);return keep(np)})
