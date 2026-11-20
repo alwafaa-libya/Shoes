@@ -309,7 +309,7 @@ var cart={},cust={name:'',city:'',tel:'',note:''},curInv=null;
 var fbApp=null,fb=null,db=null,auth=null,live=false,dbErr='',user=null;
 /* وضع الصيانة: يُحفظ في products/_site (closed + msg) */
 var SITE={closed:false,msg:''},siteSub=null,SITE_MSG='المنظومة قيد التحديث والتطوير الآن.\nنعود إليكم قريباً بإذن الله 🌷';
-function watchSite(){if(siteSub||!fb||!db)return;var F=fb.fs;siteSub=F.onSnapshot(F.doc(db,'products','_site'),function(d){SITE=d.exists()?d.data():{closed:false,msg:''};if(SITE.closed&&!user&&!isAdminUrl&&!storeMode)closeSheets();if(!editing())render()},function(e){console.warn('site',e)})}
+function watchSite(){if(siteSub||!fb||!db)return;var F=fb.fs;siteSub=F.onSnapshot(F.doc(db,'products','_site'),function(d){SITE=d.exists()?d.data():{closed:false,msg:''};siteReady=true;lsS('ts_lk',SITE.lock?'1':'0');if(SITE.closed&&!user&&!isAdminUrl&&!storeMode)closeSheets();if(!editing())render()},function(e){console.warn('site',e)})}
 function renderClosed(){app.innerHTML='<div class="wrap"><div class="closedpg"><img class="logo" src="'+LOGO+'" alt="TS"><h2 class="brand">'+esc(D.shop)+'</h2><p>🔧 '+esc(SITE.msg||SITE_MSG)+'</p><a href="https://wa.me/218915101605" target="_blank" rel="noopener">تواصل معنا على واتساب</a></div></div>'}
 function siteBox(){var c=!!SITE.closed;return '<div class="sitebox'+(c?' off':'')+'"><div><b>'+(c?'🔒 الموقع مغلق الآن للزبائن (وضع التطوير)':'✅ الموقع يعمل الآن للزبائن')+'</b><span>'+(c?'الزبائن يرون رسالة الصيانة فقط ولا يستطيعون الطلب. أنت تستطيع فتح صفحة الزبائن من هذا الجهاز وتجربتها عادي.':'عند الإيقاف يرى الزبائن رسالة الصيانة بدل المتجر. الرابط نفسه لا يتغير.')+'</span><input id="siteMsg" type="text" placeholder="رسالة الصيانة للزبائن" value="'+esc(SITE.msg||SITE_MSG.replace(/\n/g,' '))+'"></div><button class="btn '+(c?'acc':'ghost dng')+'" id="siteTgl" type="button">'+(c?'🔓 فتح الموقع للزبائن':'🔒 إيقاف الموقع للتطوير')+'</button></div>'}
 function siteToggle(btn){var c=!SITE.closed;if(c&&!btn.dataset.sure){btn.dataset.sure='1';btn.textContent='متأكد؟ اضغط مرة ثانية للإيقاف';return}var mi=document.getElementById('siteMsg'),m=(mi&&mi.value||'').trim()||SITE_MSG;btn.disabled=true;var F=fb.fs;F.setDoc(F.doc(db,'products','_site'),{closed:c,msg:m,at:Date.now()},{merge:true}).then(function(){SITE.closed=c;SITE.msg=m;render();toast(c?'🔒 تم إيقاف الموقع للزبائن':'🔓 تم فتح الموقع للزبائن',4000)},function(e){console.error(e);btn.disabled=false;toast(permMsg(e),4500)})}
@@ -378,10 +378,40 @@ function fetchCart(ids){if(!fb||!db)return;var F=fb.fs;ids.forEach(function(id){
 try{var cs=JSON.parse(localStorage.getItem('wf_cust')||'null');if(cs)cust=Object.assign(cust,cs)}catch(e){}
 
 /* ---------- main render ---------- */
+/* ---------- customer access (simple protection) ---------- */
+var siteReady=false,TRIAL=24*3600000;setTimeout(function(){if(!siteReady){siteReady=true;try{render()}catch(e){}}},7000);
+function lsG(k){try{return localStorage.getItem(k)||''}catch(e){return ''}}
+function lsS(k,v){try{localStorage.setItem(k,v)}catch(e){}}
+function devId(){var d=lsG('ts_dev');if(!d){d='D'+Date.now().toString(36).toUpperCase()+Math.random().toString(36).slice(2,7).toUpperCase();lsS('ts_dev',d)}return d}
+function accState(){if(user||isAdminUrl||storeMode)return 'ok';if(!siteReady)return lsG('ts_lk')==='1'?'wait':'ok';if(!SITE.lock)return 'ok';
+ var C=SITE.cust||{},d=lsG('ts_dev');if(d&&C[d])return C[d].off?'off':'ok';
+ if(SITE.code&&lsG('ts_gc')===String(SITE.code))return 'ok';return 'lock'}
+function trialLeft(){var f=+lsG('ts_first')||Date.now();return Math.max(1,Math.ceil((TRIAL-(Date.now()-f))/3600000))}
+function askLink(){return 'https://wa.me/'+waOf(D.phone)+'?text='+encodeURIComponent('السلام عليكم، أريد رقم الدخول لمنظومة '+(D.shop||'شركة الوفاء المتميز'))}
+function trialBar(){return '<p class="note live" style="background:#fff6e0;color:#7a4b00">⏳ تصفّح تجريبي — باقي '+trialLeft()+' ساعة. <a href="'+askLink()+'" target="_blank" rel="noopener" style="font-weight:800;color:#a32d5e">اطلب رابطك الخاص من هنا</a> ليبقى مفتوحاً لك دائماً.</p>'}
+function renderLocked(st){app.innerHTML='<div class="wrap"><div class="closedpg"><img class="logo" src="'+LOGO+'" alt="TS"><h2 class="brand">'+esc(D.shop)+'</h2>'+
+ (st==='off'?'<p>🔒 تم إيقاف الدخول من هذا الهاتف. تواصل معنا لإعادة التفعيل.</p>':'<p>🔒 المنظومة خاصة بزبائن الشركة.<br>اكتب <b>رقم الدخول</b> لتفتح لك:</p>'+
+ '<div style="width:100%;max-width:320px"><div style="display:flex;gap:8px"><input id="accCode" dir="ltr" inputmode="numeric" autocomplete="off" style="flex:1;font:inherit;font-size:1.2rem;padding:10px;border-radius:12px;border:1px solid #ccc;text-align:center" placeholder="رقم الدخول"><button class="btn acc" id="accGo" type="button">دخول</button></div></div>')+
+ '<p style="font-size:.9rem;margin-top:18px">ليس عندك الرقم؟</p><a href="'+askLink()+'" target="_blank" rel="noopener">📲 اطلبه منا على واتساب</a></div></div>'}
+function accTry(){var i=document.getElementById('accCode'),v=(i&&i.value||'').trim().toUpperCase().replace(/\s/g,'');
+ if(v&&SITE.code&&v===String(SITE.code).toUpperCase()){lsS('ts_gc',String(SITE.code));render();toast('✅ أهلاً بك — تم فتح المنظومة',3000)}else toast('الرقم غير صحيح. اطلبه منا على واتساب.',4000)}
+function newTok(){var a='ABCDEFGHJKLMNPQRSTUVWXYZ23456789',t='',C=SITE.cust||{};do{t='';for(var i=0;i<6;i++)t+=a[Math.floor(Math.random()*a.length)]}while(C[t]);return t}
+function custSave(map,extra,okMsg){var F=fb.fs,d=Object.assign({cust:map},extra||{});return F.updateDoc(F.doc(db,'products','_site'),d).catch(function(e){if(e&&e.code==='not-found')return F.setDoc(F.doc(db,'products','_site'),d,{merge:true});throw e}).then(function(){SITE.cust=map;if(extra)Object.assign(SITE,extra);if(document.getElementById('custS'))custMgr();render();if(okMsg)toast(okMsg,3500)},function(e){console.error(e);toast(permMsg(e),4500)})}
+function custLink(k,c){return 'https://wa.me/'+waOf(c.t||'')+'?text='+encodeURIComponent('أهلاً '+(c.n||'')+' 🌷\nهذا رابط الدخول الخاص بك لمنظومة '+(D.shop||'شركة الوفاء المتميز')+':\n'+SITE_LINK+'?k='+k+'\n\nافتحه مرة واحدة، وبعدها تفتح لك المنظومة مباشرة.\nرمز الدخول (إن طُلب منك): '+k+'\n\nهذا الرابط خاص بك، نرجو عدم مشاركته.')}
+function custMgr(){var C=SITE.cust||{},K=Object.keys(C).sort(function(a,b){return (C[b].at||0)-(C[a].at||0)});
+ sheet('custS','حماية الأسعار','<div class="shd"><h2>🔒 حماية الأسعار</h2><button class="x" data-close="1" type="button" aria-label="إغلاق">✕</button></div>'+
+ '<div class="note" style="display:flex;justify-content:space-between;align-items:center;gap:10px"><span>الحماية: <b>'+(SITE.lock?'🔒 مفعّلة':'🔓 غير مفعّلة')+'</b></span><button class="btn '+(SITE.lock?'ghost':'acc')+'" id="custLock" type="button">'+(SITE.lock?'إيقاف الحماية':'تفعيل الحماية')+'</button></div>'+
+ '<label class="f">🔑 رقم الدخول العام <small>(تعطيه للزبون الجديد)</small><input id="cuCode" dir="ltr" inputmode="numeric" autocomplete="off" value="'+esc(SITE.code||'')+'" placeholder="مثال: 2580"></label>'+
+ '<div class="acts"><button class="btn acc" id="cuCodeSave" type="button">حفظ الرقم</button></div>'+
+ '<p class="note">إذا غيّرت الرقم، يُطلب الرقم الجديد من كل الزبائن <b>ما عدا الزبائن المعتمدين ⭐</b>. تعتمد الزبون من فاتورته بزر «⭐ اعتماد هذا الزبون».</p>'+
+ '<h3 style="margin:16px 0 8px">⭐ الزبائن المعتمدون ('+K.length+')</h3>'+(K.length?K.map(function(k){var c=C[k];return '<div style="border:1px solid var(--line);border-radius:12px;padding:10px;margin-bottom:8px'+(c.off?';opacity:.55':'')+'"><div style="display:flex;justify-content:space-between;gap:8px"><b>'+esc(c.n||'—')+(c.off?' (موقوف)':'')+'</b><span class="num" dir="ltr">'+esc(c.t||'')+'</span></div>'+
+  '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px"><button class="btn ghost" data-cuoff="'+k+'" type="button">'+(c.off?'✅ تفعيل':'⏸️ إيقاف')+'</button><button class="btn ghost" data-cudel="'+k+'" type="button">🗑️ حذف</button></div></div>'}).join(''):'<p class="note">لا يوجد زبائن معتمدون بعد.</p>'))}
+function custOk(id){var o=(orders||[]).filter(function(x){return x.id===id})[0];if(!o||!o.dev)return;var c=o.customer||{},C=Object.assign({},SITE.cust||{});C[o.dev]={n:c.name||'',t:c.tel||'',at:Date.now(),no:o.no||''};custSave(C,null,'⭐ تم اعتماد '+(c.name||'الزبون')+' — تفتح له المنظومة دائماً بدون رقم')}
 function render(){
  if(storeMode){renderStore();return}
  if(isAdminUrl){renderAdmin();return}
  if(SITE.closed&&!user){renderClosed();return}
+ var ACC=accState();if(ACC==='wait'){app.innerHTML='<div class="wrap"><div class="closedpg"><img class="logo" src="'+LOGO+'" alt="TS"><p>جارٍ التحميل…</p></div></div>';return}if(ACC==='lock'||ACC==='off'){renderLocked(ACC);return}
  var h='<div class="wrap"><header class="top"><div><div class="brandrow"><img class="logo" src="'+LOGO+'" alt="TS"><h1 class="brand">'+esc(D.shop)+'<small>'+esc(D.shopLatin||'')+'</small></h1></div>'+
  '<p class="sub"><span class="tag">جملة فقط</span> تشكيلة أحذية — اطلب بالكرتونة، والكمية المتوفرة تتحدث مباشرة.</p></div>';
  h+='<button class="cartbtn" id="openCart" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 4h2l2.4 11.2a1.5 1.5 0 0 0 1.5 1.2h8.6a1.5 1.5 0 0 0 1.5-1.2L21 8H6.2"/><circle cx="9.5" cy="20" r="1.3"/><circle cx="17" cy="20" r="1.3"/></svg>السلة<span class="bdg num">'+cartCount()+'</span></button>';
@@ -390,6 +420,7 @@ function render(){
  if(locSet&&custLoc)loadBri(custLoc);
  if(!locSet){h+=locPick()+chBtn()+'<p class="pfoot">للاستفسار واتساب: <span class="num">+'+waOf(D.phone)+'</span></p></div>';app.innerHTML=h;return}
  h+=locBar();
+ if(ACC==='trial')h+=trialBar();
  h+=newsBar();
  h+=chBtn();
  if(dbErr)h+='<p class="note live">⚠️ تعذّر الاتصال بالمخزون المباشر. تأكد من الإنترنت ثم حدّث الصفحة.</p>';
@@ -569,7 +600,7 @@ function sendOrder(){
    snaps.forEach(function(s,i){var st=s.exists()?bq(s.data(),LK):0;if(st<L[i].q)short.push(L[i].code+' (المتوفر '+st+')')});
    if(short.length){var e=new Error('short');e.short=short;throw e}
    snaps.forEach(function(s,i){tx.update(refs[i],locUpd(LK,bq(s.data(),LK)-L[i].q))});
-   tx.set(F.doc(F.collection(db,'orders')),{no:no,date:today(),loc:LK,locName:locName(LK),status:'new',createdAt:F.serverTimestamp(),customer:{name:cust.name,city:cust.city,tel:cust.tel,note:cust.note},lines:L,totals:T});
+   tx.set(F.doc(F.collection(db,'orders')),{no:no,date:today(),loc:LK,locName:locName(LK),status:'new',dev:devId(),createdAt:F.serverTimestamp(),customer:{name:cust.name,city:cust.city,tel:cust.tel,note:cust.note},lines:L,totals:T});
   });
  }).then(function(){
   busy=false;cart={};saveCart();curInv=null;render();if(!LK)notifyOwner(lastOrder);var bt=LK&&BRI[LK]&&BRI[LK].tel;
@@ -935,6 +966,7 @@ function renderAdmin(){
   if(D.fromDb)h+='<div class="scanbox"><div><b>استيراد الأصناف من إكسل</b><span>رقم الصنف، الاسم، المقاسات، العبوة، السعر، الكمية، والقسم (رجالي / نسائي / أولاد / بنات، أو للبلاستيك: بلاستيك رجالي / بلاستيك نسائي / بلاستيك أولاد / بلاستيك بنات). الأصناف الموجودة تتحدّث، والجديدة تُضاف. الصور تضيفها باليد بعد ذلك.</span></div><div class="xbtns"><button class="scan" id="xlsPre" type="button">اختر ملف الإكسل</button><button class="btn ghost" id="xlsTpl" type="button">تنزيل النموذج</button></div></div>';
   h+=ctrDl();
   if(D.fromDb){var nCt=D.products.filter(function(p){return !String(p.ctr||'').trim()&&!p.pend}).length;if(nCt)h+='<div class="scanbox"><div><b>🏷️ تصنيف الأصناف القديمة</b><span>'+nCt+' صنف بدون تصنيف حاوية. اكتب لها تصنيفاً واحداً (مثل: بضاعة قديمة) لتظهر كتصنيف في الفاتورة اليدوية. ويمكن تعديل تصنيف أي صنف من بطاقته.</span></div><div class="xbtns"><input id="ctrOldIn" class="msearch" list="ctrDl" value="بضاعة قديمة" style="max-width:220px"><button class="scan" id="ctrOldGo" type="button">تطبيق</button><button class="btn ghost" data-admcat="noctr" type="button">👁️ عرض الأصناف بدون تصنيف</button></div></div>'}
+  if(D.fromDb)h+='<div class="scanbox"><div><b>🔒 حماية الأسعار</b><span>'+(SITE.lock?'🔒 مفعّلة':'🔓 غير مفعّلة')+(SITE.code?' — رقم الدخول: <b dir="ltr">'+esc(SITE.code)+'</b>':' — لم تحدد رقم الدخول بعد')+' — ⭐ '+Object.keys(SITE.cust||{}).length+' زبون معتمد.</span></div><div class="xbtns"><button class="scan" id="custMgr" type="button">🔒 إعداد الحماية</button></div></div>';
   if(D.fromDb)h+='<div class="scanbox"><div><b>📢 إعلان البضاعة الجديدة في القناة</b><span>بعد اعتماد دفعة جديدة وتصنيفها: يجهّز النظام نص الإعلان (بدون رابط المنظومة وبدون أسعار)، تنسخه، ثم تفتح قناة الواتساب وتلصقه وترسله.</span></div><div class="xbtns"><button class="scan" id="chAnn" type="button">📢 إعلان في القناة</button></div></div>';
   if(D.fromDb)h+='<div class="scanbox"><div><b>🏷️ تصنيف أصناف حاوية سابقة من شيتها</b><span>اختر شيت إكسل حاوية سابقة (مثل TAHER636)، فتأخذ أصنافها الموجودة في المنظومة تصنيف تلك الحاوية دون تغيير الكميات أو الأسعار.</span></div><div class="xbtns"><button class="scan" id="ctrXl" type="button">تصنيف حسب شيت حاوية</button></div></div>';
   var acn=catCounts(D.products);if(admCat==='auto'&&D.fromDb&&D.products.length)admCat=acn.pend?'pend':acn.none?'none':'all';if(admCat==='pend'&&!acn.pend)admCat=acn.none?'none':'all';if(admCat==='none'&&!acn.none)admCat='all';if(admCat==='hidden'&&!acn.hidden)admCat='all';
@@ -957,6 +989,7 @@ function orderCard(o){
  '<div class="pcust"><div><span>الزبون</span><b>'+esc(c.name||'—')+'</b></div><div><span>المدينة</span><b>'+esc(c.city||'—')+'</b></div><div><span>الهاتف</span><b class="num">'+esc(c.tel||'—')+'</b></div>'+locDiv(o)+(c.note?'<div class="wide"><span>ملاحظات</span><b>'+esc(c.note)+'</b></div>':'')+'</div>'+
  invTable(o.lines||[])+
  '<div class="grandl"><span>المبلغ</span><b><span class="num">'+money(T.t)+'</span> د.ل · '+(T.c||0)+' كرتونة</b></div>'+
+ (o.dev&&o.status!=='rejected'?((SITE.cust||{})[o.dev]?'<p class="note" style="text-align:center;margin:6px 0">⭐ زبون معتمد — تفتح له المنظومة دائماً</p>':'<button class="btn ghost" data-cuok="'+o.id+'" type="button" style="width:100%;margin:6px 0">⭐ اعتماد هذا الزبون؟ (تفتح له المنظومة دائماً بدون رقم)</button>'):'')+
  (o.status==='new'?'<div class="two-b"><button class="btn acc" data-accept="'+o.id+'" type="button">✅ قبول وتجهيز الفاتورة PDF</button><button class="btn ghost" data-reject="'+o.id+'" type="button">رفض وإرجاع الكمية</button></div>':
   o.status!=='rejected'?pdfBtns(o):'')+
  (o.manual&&o.status!=='rejected'?'<button class="btn ghost" data-medit="'+o.id+'" type="button">✏️ تعديل الأصناف والكميات'+(o.editedAt?' (عُدّلت '+(o.edits||1)+')':'')+'</button>':'')+(o.manual&&o.status!=='rejected'?'<button class="btn cancelm" data-mcancel="'+o.id+'" type="button">↩️ إلغاء الفاتورة وإرجاع الكمية للمخزون</button>':'')+
@@ -1340,6 +1373,8 @@ document.addEventListener('click',function(e){
  if(t.id==='pwReset'){pwSet(t.dataset.em,INIT_PW,t);return}
  if(ds.bssave){saveBs(ds.bssave,t);return}
  if(ds.pd){pdOpen(ds.pd);return}
+ if(ds.cuok){custOk(ds.cuok);return}
+ if(ds.cuoff||ds.cudel){var C=Object.assign({},SITE.cust||{}),k=ds.cuoff||ds.cudel;if(!C[k])return;if(ds.cudel){if(!ds.sure){ds.sure='1';t.textContent='متأكد؟ اضغط مرة ثانية';return}delete C[k]}else C[k]=Object.assign({},C[k],{off:!C[k].off});custSave(C);return}
  if(t.id==='openCart3'){openCart();return}
  if(ds.zoom){openZoom(find(ds.zoom));return}
  if(ds.inc){if(!locSet&&!isAdminUrl){render();toast('اختر الفرع أولاً');return}var p=find(ds.inc);if((cart[p.id]||0)<av(p)){var first=!cart[p.id];cart[p.id]=(cart[p.id]||0)+1;curInv=null;saveCart();if(first)toast('أُضيف '+p.code+' إلى السلة')}render();return}
@@ -1423,6 +1458,10 @@ document.addEventListener('click',function(e){
   case 'chkOnly':chkOnly=!chkOnly;render();return;
   case 'xlGo':xlSave();return;
   case 'chAnn':chAnn();return;
+  case 'custMgr':custMgr();return;
+  case 'cuCodeSave':(function(){var v=(document.getElementById('cuCode').value||'').trim().toUpperCase().replace(/\s/g,'');if(v.length<3){toast('اكتب رقماً من 3 خانات على الأقل');return}custSave(Object.assign({},SITE.cust||{}),{code:v},'🔑 تم حفظ رقم الدخول: '+v)})();return;
+  case 'accGo':accTry();return;
+  case 'custLock':(function(){var on=!SITE.lock;if(on&&!SITE.code){toast('احفظ رقم الدخول العام أولاً');return}custSave(Object.assign({},SITE.cust||{}),{lock:on},on?'🔒 تم تفعيل الحماية':'🔓 تم إيقاف الحماية')})();return;
   case 'chCopy':chCopy(t);return;
   case 'bulkGo':bulkCat(t);return;
   case 'bulkHide':case 'bulkShow':bulkHide(t,t.id==='bulkHide');return;
