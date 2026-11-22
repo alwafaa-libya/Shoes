@@ -553,16 +553,36 @@ function a4Pages(o){var c=o.customer||{},T=o.totals||{},L=o.lines||[],pages=[],i
    h+='<div style="display:flex;gap:40px;margin-top:40px;font-size:16px"><div style="flex:1">اسم المجهّز: ............................<br><br>التوقيع: ............................</div><div style="flex:1">تاريخ التجهيز: ......../......../........<br><br>توقيع المستلم: ............................</div></div>'}
   h+='<div style="position:absolute;bottom:22px;left:46px;right:46px;text-align:center;font-size:13px;color:#666">صفحة '+(pi+1)+' من '+N+'</div></div>';return h})}
 function anyOrd(id){return (orders||[]).concat(typeof brSales!=='undefined'?brSales:[]).filter(function(x){return x.id===id})[0]}
-function prepStorePdf(id){var o=anyOrd(id);if(!o)return;toast('جارٍ تجهيز ملف PDF…',3000);
+function prepStorePdf(id,auto){var o=anyOrd(id);if(!o)return;toast('جارٍ تجهيز ملف PDF…',3000);
  var w=document.createElement('div');w.style.cssText='position:fixed;left:-10000px;top:0';w.innerHTML=a4Pages(o).join('');document.body.appendChild(w);
  Promise.all([h2i(),jspdfLib()]).then(function(r){var H=r[0],J=r[1],doc=new J.jsPDF({unit:'mm',format:'a4'}),pg=[].slice.call(w.children),op={pixelRatio:2,skipFonts:true,backgroundColor:'#fff',quality:.92};
   return pg.reduce(function(pr,el,k){return pr.then(function(){return H.toJpeg(el,op).then(function(){return H.toJpeg(el,op)}).then(function(u){if(k)doc.addPage();doc.addImage(u,'JPEG',0,0,210,297)})})},Promise.resolve()).then(function(){return doc.output('blob')})
- }).then(function(b){w.remove();pdfReady[id]=new File([b],'فاتورة-'+o.no+'.pdf',{type:'application/pdf'});render();toast('✅ الفاتورة PDF جاهزة — اضغط «إرسال» واختر الزبون والمخزن في واتساب',5000)
+ }).then(function(b){w.remove();pdfReady[id]=new File([b],'فاتورة-'+o.no+'.pdf',{type:'application/pdf'});render();if(auto&&tgStoreOn()&&!o.tgStore){tgSendPdf(id);return}toast('✅ الفاتورة PDF جاهزة — اضغط «إرسال» واختر الزبون والمخزن في واتساب',5000)
  }).catch(function(e){console.error(e);w.remove();toast('تعذّر تجهيز الملف. تأكد من الإنترنت وحاول مرة أخرى.',4000)})}
 function shareStorePdf(id){var f=pdfReady[id];if(!f)return;
  function sent(){try{fb.fs.updateDoc(fb.fs.doc(db,'orders',id),{sentToStore:true,pdfSent:true}).catch(function(){})}catch(e){}}
  if(navigator.canShare&&navigator.canShare({files:[f]})){navigator.share({files:[f]}).then(sent,function(){});return}
  var u=URL.createObjectURL(f),a=document.createElement('a');a.href=u;a.download=f.name;document.body.appendChild(a);a.click();a.remove();toast('تم حفظ ملف PDF',3500)}
+/* ---------- telegram: warehouse group ---------- */
+function tgStoreOn(){return !!(TG_NOTIFY.token&&typeof SITE!=='undefined'&&SITE&&SITE.tgStore)}
+function siteSet(d){var F=fb.fs;return F.updateDoc(F.doc(db,'products','_site'),d).catch(function(e){if(e&&e.code==='not-found')return F.setDoc(F.doc(db,'products','_site'),d,{merge:true});throw e}).then(function(){Object.assign(SITE,d);render()})}
+function tgSendPdf(id){var o=anyOrd(id),f=pdfReady[id];if(!o||!f||!tgStoreOn())return;var c=o.customer||{},T=o.totals||{};
+ var cap='📦 طلب تجهيز — فاتورة رقم '+(o.no||'')+(o.manual&&o.toLoc?'\n🏬 توزيع إلى فرع: '+(o.locName||locName(o.toLoc)):'\n👤 الزبون: '+(c.name||'—')+(c.city?' — '+c.city:''))+'\n📦 '+(T.c||0)+' كرتونة — '+(o.lines||[]).length+' صنف\nجهّزوا البضاعة وأشّروا على كل صنف في الورقة ✓';
+ var fd=new FormData();fd.append('chat_id',SITE.tgStore);fd.append('caption',cap);fd.append('document',f,f.name);
+ fetch('https://api.telegram.org/bot'+TG_NOTIFY.token+'/sendDocument',{method:'POST',body:fd,mode:'no-cors'}).then(function(){
+  try{fb.fs.updateDoc(fb.fs.doc(db,'orders',id),{tgStore:true,sentToStore:true}).catch(function(){})}catch(e){}o.tgStore=true;render();
+  toast('✅ أُرسلت الفاتورة PDF إلى مجموعة المخزن على تيليجرام. أرسلها للزبون من زر «إرسال» إن أردت.',6000)
+ },function(e){console.error(e);toast('تعذّر الإرسال إلى تيليجرام. تأكد من الإنترنت ثم اضغط «إرسال للمخزن» مرة أخرى.',5000)})}
+function tgLinkStore(btn){if(!TG_NOTIFY.token)return;btn.disabled=true;btn.textContent='جارٍ البحث عن المجموعة…';
+ fetch('https://api.telegram.org/bot'+TG_NOTIFY.token+'/getUpdates?allowed_updates='+encodeURIComponent('["message","my_chat_member"]')).then(function(r){return r.json()}).then(function(j){
+  var G={},last=null;(j.result||[]).forEach(function(u){var m=u.message||u.my_chat_member;if(!m||!m.chat)return;var ch=m.chat;if(ch.type!=='group'&&ch.type!=='supergroup')return;
+   var id=String(ch.id);if(u.message&&u.message.migrate_to_chat_id)id=String(u.message.migrate_to_chat_id);G[id]=ch.title||'';last=id});
+  var ids=Object.keys(G);if(!ids.length){btn.disabled=false;btn.textContent='🔗 ربط مجموعة المخزن';toast('لم أجد المجموعة. اكتب /start داخل مجموعة المخزن في تيليجرام، ثم اضغط الزر مرة أخرى.',7000);return}
+  var pick=ids.filter(function(i){return /تجهيز|مخزن/.test(G[i])})[0]||last;
+  return siteSet({tgStore:pick,tgStoreName:G[pick]||''}).then(function(){toast('✅ تم ربط مجموعة «'+(G[pick]||'المخزن')+'». اضغط «رسالة تجربة» للتأكد.',6000)})
+ }).catch(function(e){console.error(e);btn.disabled=false;btn.textContent='🔗 ربط مجموعة المخزن';toast('تعذّر الاتصال بتيليجرام. تأكد من الإنترنت وحاول مرة أخرى.',5000)})}
+function tgTest(){if(!tgStoreOn())return;fetch('https://api.telegram.org/bot'+TG_NOTIFY.token+'/sendMessage?chat_id='+encodeURIComponent(SITE.tgStore)+'&text='+encodeURIComponent('✅ تم ربط منظومة الوفاء المتميز بمجموعة المخزن.\nمن الآن تصل هنا فاتورة PDF لكل طلب يتم اعتماده.'),{mode:'no-cors'}).then(function(){toast('أُرسلت رسالة تجربة — افتح مجموعة المخزن في تيليجرام وتأكد أنها وصلت',6000)},function(){toast('تعذّر الإرسال. تأكد من الإنترنت.',4000)})}
+function tgBox(){return '<div class="storeset"><label>📦 مجموعة المخزن على تيليجرام</label>'+(tgStoreOn()?'<small>✅ مربوطة بمجموعة «'+esc(SITE.tgStoreName||'المخزن')+'». عند اعتماد أي طلب من مخزن بنغازي الرئيسي، أو فاتورة توزيع على فرع، تصل الفاتورة PDF إلى المجموعة وحدها.</small><div style="display:flex;gap:8px;margin-top:6px"><button class="btn acc" data-tgtest="1" type="button">✉️ رسالة تجربة</button><button class="btn ghost" data-tglink="1" type="button">🔄 إعادة الربط</button><button class="btn ghost" data-tgoff="1" type="button">إيقاف</button></div>':'<button class="btn acc" data-tglink="1" type="button">🔗 ربط مجموعة المخزن</button><small>قبل الضغط: أضف البوت إلى مجموعة المخزن، واكتب داخلها /start</small>')+'</div>'}
 var lastOrder=null;
 function flat(L){return L.map(function(l){return {id:l.p.id,code:l.p.code,name:l.p.name||'',sizes:l.p.sizes,pack:l.p.pack,price:l.p.price,q:l.q,pcs:l.pcs,tot:l.tot}})}
 function openInvoice(){
@@ -842,7 +862,7 @@ function manSave(){if(man&&man.edit){manSaveEdit();return}manSync();var isB=role
   })}).then(function(){
   busy=false;if(isB){man=null;closeSheets();render();scrollTo(0,0);toast(TK?'✅ تم نقل '+cartons(T.c)+' من مخزن بنغازي الرئيسي إلى رصيد فرع '+locName(TK):'✅ تم حفظ الواصل لفرع '+cu.name+' وخصم '+cartons(T.c)+' من المنظومة',5000);notifyBranch(cu.name,L,T);return}
   manKeepBr(cu.name);man=null;closeSheets();adminTab='orders';ordTab='accepted';render();scrollTo(0,0);
-  if(TK){var nid=ref.id,tries=0;(function pp(){if(anyOrd(nid)){prepStorePdf(nid)}else if(++tries<10)setTimeout(pp,700)})()}
+  if(TK){var nid=ref.id,tries=0;(function pp(){if(anyOrd(nid)){prepStorePdf(nid,true)}else if(++tries<10)setTimeout(pp,700)})()}
   toast(TK?'✅ تم نقل '+cartons(T.c)+' من مخزن بنغازي الرئيسي إلى رصيد فرع '+locName(TK):'✅ تم حفظ فاتورة '+cu.name+' وخصم '+cartons(T.c)+' من المخزون',4500);
  },function(e){busy=false;b.disabled=false;b.textContent='💾 حفظ الفاتورة وخصم المخزون';
   if(e&&e.short){manErr('الكمية في المخزن أقل من المطلوب: '+e.short.join('، ')+'. عدّل الكمية ثم احفظ مرة أخرى.');return}
@@ -963,7 +983,7 @@ function renderAdmin(){
  }else if(adminTab==='orders'){
   h+='<button class="btn acc manbtn" id="openMan" type="button">🏬 فاتورة يدوية — توزيع على فرع'+(man&&man.ord.length?' <small>(مسودة: '+man.ord.length+' صنف)</small>':'')+'</button>';
   h+='<div class="storeset"><label>رقم واتساب المخزن<input id="storeNum" type="tel" dir="ltr" inputmode="tel" placeholder="09xxxxxxxx" value="'+esc(storeNum())+'"></label><small>يُحفظ على هذا الجهاز. إذا تركته فارغاً، يسألك الواتساب لمن ترسل (شخص أو مجموعة).</small></div>';
-  h+='<div class="storeset"><label>🔔 إشعارات الطلبات الجديدة</label>'+(notifOn()?'<small>✅ الإشعارات مفعّلة على هذا الجهاز: صوت وإشعار عند وصول أي طلب ما دامت هذه الصفحة مفتوحة.</small>':'<button class="btn acc" data-notif="1" type="button">تفعيل الإشعارات على هذا الجهاز</button><small>اضغط مرة واحدة واختر «سماح».</small>')+'<small>'+(phoneOn()?'✅ إشعار تيليجرام مفعّل: تصلك رسالة على هاتفك مع كل طلب.':'⚠️ إشعار تيليجرام غير مفعّل بعد.')+'</small></div>';h+=pwBox();
+  h+='<div class="storeset"><label>🔔 إشعارات الطلبات الجديدة</label>'+(notifOn()?'<small>✅ الإشعارات مفعّلة على هذا الجهاز: صوت وإشعار عند وصول أي طلب ما دامت هذه الصفحة مفتوحة.</small>':'<button class="btn acc" data-notif="1" type="button">تفعيل الإشعارات على هذا الجهاز</button><small>اضغط مرة واحدة واختر «سماح».</small>')+'<small>'+(phoneOn()?'✅ إشعار تيليجرام مفعّل: تصلك رسالة على هاتفك مع كل طلب.':'⚠️ إشعار تيليجرام غير مفعّل بعد.')+'</small></div>';h+=tgBox();h+=pwBox();
   if(ordersErr)h+='<p class="err">'+esc(ordersErr)+'</p>';
   else if(!orders.length)h+='<p class="empty">لا توجد طلبات بعد. أي طلب يرسله زبون يظهر هنا فوراً.</p>';
   else{
@@ -1001,7 +1021,7 @@ function renderAdmin(){
 }
 function brMgrTel(o){var k=o&&o.manual&&o.toLoc;if(!k)return '';loadBri(k);return (BRI[k]||{}).tel||''}
 function pdfBtns(o){var c=o.customer||{},isBr=!!(o.manual&&o.toLoc),tel=isBr?(brMgrTel(o)||c.tel):c.tel,who=isBr?'مدير فرع '+(o.locName||locName(o.toLoc)):'الزبون والمخزن';
- return '<button class="btn invimg pdfbtn" data-storepdf="'+o.id+'" type="button" style="'+(pdfReady[o.id]?'background:var(--ok);color:#fff':'')+'">'+(pdfReady[o.id]?'📤 إرسال الفاتورة PDF — اختر '+esc(who)+' في واتساب':'📄 تجهيز الفاتورة PDF')+(o.pdfSent?' (أُرسلت ✓)':'')+'</button>'+
+ return '<button class="btn invimg pdfbtn" data-storepdf="'+o.id+'" type="button" style="'+(pdfReady[o.id]?'background:var(--ok);color:#fff':'')+'">'+(pdfReady[o.id]?'📤 إرسال الفاتورة PDF — اختر '+esc(who)+' في واتساب':'📄 تجهيز الفاتورة PDF')+(o.pdfSent?' (أُرسلت ✓)':'')+'</button>'+(tgStoreOn()&&(!o.loc||o.manual)?'<button class="btn ghost" data-tgsend="'+o.id+'" type="button" style="display:block;width:100%;margin-top:6px">'+(o.tgStore?'📨 أُرسلت للمخزن على تيليجرام ✓ — إرسال مرة أخرى':'📨 إرسال للمخزن على تيليجرام')+'</button>':'')+
  (tel?'<a class="wa2" style="display:block;text-align:center;margin-top:6px;font-size:.9rem" href="'+waChat(tel)+'" target="_blank" rel="noopener">💬 '+(isBr?'فتح محادثة '+esc(who)+' <span dir="ltr">'+esc(tel)+'</span>':'الزبون غير موجود في قائمة واتساب؟ افتح محادثته أولاً')+'</a>':(isBr?'<p class="note" style="text-align:center;margin:6px 0">⚠️ '+esc(who)+' لم يسجّل رقم واتسابه بعد في المنظومة.</p>':''))}
 function waChat(t){return 'https://wa.me/'+waOf(t)}
 function orderCard(o){
@@ -1131,7 +1151,7 @@ function seed(){
 function acceptOrder(id){
  var o=orders.filter(function(x){return x.id===id})[0];if(!o)return;
  fb.fs.updateDoc(fb.fs.doc(db,'orders',id),{status:'accepted',doneAt:fb.fs.serverTimestamp()}).catch(function(e){console.error(e);toast(permMsg(e))});
- prepStorePdf(id);
+ prepStorePdf(id,!o.loc);
 }
 var SLB={new:'جديد',accepted:'موافق عليه',rejected:'مرفوض'};
 function delOne(o){var F=fb.fs;
@@ -1412,6 +1432,10 @@ document.addEventListener('click',function(e){
  if(ds.otab){ordTab=ds.otab;render();scrollTo(0,0);return}
  if(ds.store){try{fb.fs.updateDoc(fb.fs.doc(db,'orders',ds.store),{sentToStore:true})}catch(er){}return}
  if(ds.prep!=null&&storeMode){togglePrep(+ds.prep);return}
+ if(ds.tglink){tgLinkStore(t);return}
+ if(ds.tgtest){tgTest();return}
+ if(ds.tgoff){siteSet({tgStore:'',tgStoreName:''}).then(function(){toast('تم إيقاف الإرسال لمجموعة المخزن',4000)});return}
+ if(ds.tgsend){if(pdfReady[ds.tgsend])tgSendPdf(ds.tgsend);else prepStorePdf(ds.tgsend,true);return}
  if(ds.storepdf){if(pdfReady[ds.storepdf])shareStorePdf(ds.storepdf);else prepStorePdf(ds.storepdf);return}
  if(ds.invimg){if(invReady[ds.invimg])shareInvImg(ds.invimg);else prepInvImg(ds.invimg);return}
  if(ds.xlord){xlOrders(ds.xlord);return}
